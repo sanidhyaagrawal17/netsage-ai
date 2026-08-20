@@ -1,0 +1,10 @@
+# NetSage AI - Live Packet Tracer Capture [2026-08-20 10:07:45]
+
+SW1# show interfaces status
+Port      Name               Status       Vlan       Duplex  Speed Type
+Gi0/1     Trunk_to_Core      connected    trunk      a-full a-1000 1000BaseTX
+Gi0/2     Workstation_V10    connected    10         a-full  a-100 1000BaseTX
+Gi0/3     Printer_V20        connected    20         a-full  a-100 1000BaseTX
+
+SW1# show logging
+%CDP-4-NATIVE_VLAN_MISMATCH: Native VLAN mismatch discovered on GigabitEthernet0/1 (1), with Core-SW1 GigabitEthernet0/1 (99).
