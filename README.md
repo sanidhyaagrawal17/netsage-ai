@@ -1,6 +1,46 @@
-# NetSage AI 🌐 (Phase 3: Dual-Track Capstone & Research Suite)
+# NetSage AI 🌐
 
-> AI-assisted network troubleshooting engine combining deterministic Python checks across L2–L7, local Small Language Model (SLM) reasoning via Ollama, live Cisco Packet Tracer clipboard ingestion (Track A), and empirical research benchmarking for IEEE publication (Track B).
+> **AI-Assisted Network Diagnostic Engine with Human-in-the-Loop Safeguards**  
+> *A deterministic + Local SLM (Ollama) AIOps engine for Cisco Packet Tracer and enterprise laboratory troubleshooting with empirical telemetry instrumentation.*
+
+---
+
+## 📌 Overview
+
+**NetSage AI** bridges the diagnostic gap for network engineers by pairing deterministic rule-based checks with local Small Language Model (SLM) reasoning. It automates root-cause analysis across **OSI Layers 2 through 7**, enforces strict **Human-in-the-Loop (HITL)** review gates, and captures publication-grade performance telemetry (**RQ2 & RQ3**).
+
+```
+                      ┌───────────────────────────────────────────────┐
+                      │    Input Telemetry & CLI 'show' Outputs       │
+                      │  (symptom, topology, show outputs from lab)   │
+                      └──────────────────────┬────────────────────────┘
+                                             │
+                     ┌───────────────────────┴───────────────────────┐
+                     ▼                                               ▼
+         ┌────────────────────────┐                     ┌────────────────────────┐
+         │ Stage 1: Deterministic │                     │  Stage 2: Local SLM    │
+         │   Python Rule Engine   │                     │   Reasoning (Ollama)   │
+         │  (checker.py: L2-L7)   │                     │  (llm_engine.py: 3B)   │
+         └───────────┬────────────┘                     └───────────┬────────────┘
+                     │                                               │
+                     └───────────────────────┬───────────────────────┘
+                                             ▼
+                              ┌─────────────────────────────┐
+                              │  Streamlit Diagnostic Panel │
+                              │ (Anomalies + Root Cause Fix)│
+                              └──────────────┬──────────────┘
+                                             ▼
+                              ┌─────────────────────────────┐
+                              │ Human-in-the-Loop (HITL)    │
+                              │ Approval Gate (app.py)      │
+                              │ [Accept | Edit | Reject]    │
+                              └──────────────┬──────────────┘
+                                             ▼
+                              ┌─────────────────────────────┐
+                              │  Responsible AI Audit Log   │
+                              │  (responsible_ai_log.csv)   │
+                              └─────────────────────────────┘
+```
 
 ---
 
@@ -19,23 +59,32 @@ netsage-ai/
 ├── app.py                      # Streamlit interactive dashboard with live feed & HITL workflow
 ├── responsible_ai_log.csv      # Auto-generated Responsible AI audit trail & failure taxonomy
 ├── requirements.txt            # Python dependencies (streamlit, requests, pandas, pydantic, psutil, pyperclip)
-└── README.md                   # Quickstart documentation
+└── README.md                   # Project documentation
 ```
 
 ---
 
-## 🚀 Quickstart & Dual-Track Operations
+## 🚀 Quickstart & Setup
 
 ### 1. Install Dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
+### 2. (Optional) Start Local SLM via Ollama
+Ensure [Ollama](https://ollama.com) is installed and pull your target model:
+```bash
+ollama run qwen2.5-coder:3b
+```
+*(Note: If Ollama is offline, NetSage AI will automatically engage its deterministic simulation fallback mode with full telemetry profiling.)*
+
 ---
 
-### ⚡ Track A: Live Packet Tracer Demo Workflow
+## ⚡ Dual-Track Operations
 
-1. Start the clipboard listener daemon in one terminal:
+### Track A: Live Packet Tracer Demo Workflow
+
+1. Start the clipboard listener daemon:
    ```bash
    python pt_listener.py
    ```
@@ -43,27 +92,48 @@ pip install -r requirements.txt
    ```bash
    streamlit run app.py
    ```
-3. Open **Cisco Packet Tracer**, copy any router/switch CLI output (e.g. `show ip interface brief`, `show access-lists`, `show interfaces trunk`).
-4. `pt_listener.py` automatically captures the output into `live_cli_input.txt`.
-5. In Streamlit, select **"⚡ Live Packet Tracer Feed"** from the sidebar to immediately inspect, diagnose, and review live lab anomalies!
+3. Copy any router/switch CLI output in **Cisco Packet Tracer** (e.g., `show ip interface brief`, `show access-lists`, `show interfaces trunk`).
+4. `pt_listener.py` automatically captures the text into `live_cli_input.txt`.
+5. In Streamlit, switch to **"⚡ Live Packet Tracer Feed"** from the sidebar to inspect, diagnose, and review live lab anomalies in real time.
 
 ---
 
-### 🔬 Track B: Empirical Benchmarking for IEEE Publication
+### Track B: Empirical Benchmarking for IEEE Publication
 
-To run the automated empirical testbed across all 30 cases:
+To execute the automated empirical testbed across all 30 cases:
 ```bash
 python run_benchmarks.py
 ```
-This runs **Variant A (Deterministic Rules)** and **Variant C (Hybrid SLM Engine)** across the 30 cases, extracts native execution latency, token throughput, and memory footprint, and generates **`benchmark_paper_results.csv`**.
+This runs **Variant A (Deterministic Rules)** and **Variant C (Hybrid SLM Engine)**, measures execution latency, token throughput, and memory footprint, and generates **`benchmark_paper_results.csv`**.
 
 ---
 
 ## 📊 Published Telemetry Metrics (RQ2 & RQ3)
 
-- **Inference Latency ($\Delta t$)**:
-  $$\Delta t = \frac{\text{total\_duration}}{10^6} \text{ ms}$$
-- **Token Throughput ($t/s$)**:
-  $$\text{Throughput} = \frac{\text{eval\_count}}{\left(\frac{\text{eval\_duration}}{10^9}\right)}$$
-- **Memory Footprint**: Process RSS RAM (MB) + Global system RAM % via `psutil`.
-- **Publication Failure Taxonomy (RQ3)**: 6 discrete failure classes for responsible human oversight.
+### 1. Inference Latency ($\Delta t$)
+```math
+\text{Latency } (\Delta t) = \frac{\text{total\_duration}}{10^6} \text{ ms}
+```
+
+### 2. Token Throughput ($t/s$)
+```math
+\text{Throughput } (t/s) = \frac{\text{eval\_count}}{\frac{\text{eval\_duration}}{10^9}}
+```
+
+### 3. Memory Footprint
+Measured as Process RSS Memory ($\text{MB}$) and Global System Virtual Memory Percentage ($\%$) via `psutil`.
+
+### 4. Publication Failure Taxonomy (RQ3)
+When human reviewers edit or reject an AI diagnosis, they categorize the failure mode into one of 6 discrete classes:
+- `None / Valid AI Diagnosis`
+- `Hallucinated CLI Evidence (Model quoted line not in show output)`
+- `Missed Subnet Mask Boundary (Model miscalculated host/subnet alignment)`
+- `Wrong OSI Layer Identification (e.g., tagged L2 issue as L3)`
+- `Unsafe / Invalid Remediation Step (CLI command syntax invalid in Cisco IOS)`
+- `Incorrect Root Cause Diagnosis (Misattributed fault)`
+
+---
+
+## 📜 License
+
+This project is developed for research and educational purposes under the MIT License.
