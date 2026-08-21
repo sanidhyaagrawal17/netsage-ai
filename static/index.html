@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetSage AI — Network Lab Copilot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- Top Header -->
+    <header class="copilot-header">
+      <div class="header-left">
+        <div class="logo-badge">⚡ NetSage AI</div>
+        <div class="header-text">
+          <h1>Network Lab Copilot</h1>
+          <p>Instant root-cause diagnosis & Cisco IOS fixes for Packet Tracer labs</p>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <!-- Mode Tabs -->
+        <div class="mode-pill-group">
+          <button id="btn-mode-live" class="pill-btn active">⚡ Live Packet Tracer</button>
+          <button id="btn-mode-guided" class="pill-btn">📚 30 Guided Cases</button>
+        </div>
+
+        <!-- Instant Theme Switcher -->
+        <button id="theme-toggle" class="theme-toggle-btn" title="Toggle Dark/Light Theme">
+          <span class="theme-icon">☀️</span>
+          <span class="theme-label">Light</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Live Status Radar Banner -->
+    <div id="live-radar-card" class="radar-card radar-active">
+      <div class="radar-left">
+        <span class="pulse-radar"></span>
+        <div>
+          <strong id="radar-title">LIVE PACKET TRACER SYNC: ACTIVE</strong>
+          <span id="radar-subtitle">Listening to clipboard for Cisco CLI outputs...</span>
+        </div>
+      </div>
+      <div class="radar-right">
+        <span id="radar-time">Checking buffer...</span>
+        <button id="btn-refresh-live" class="btn-ghost" title="Force Refresh Buffer">🔄 Refresh</button>
+      </div>
+    </div>
+
+    <!-- Case Selector Bar (Guided Mode Only) -->
+    <div id="case-selector-bar" class="case-selector-bar hidden">
+      <div class="selector-item">
+        <label for="filter-layer">Fault Domain:</label>
+        <select id="filter-layer">
+          <option value="All">All Layers (30 Cases)</option>
+          <option value="Data Link">Layer 2 — Data Link (8 Cases)</option>
+          <option value="Network">Layer 3 — Network (10 Cases)</option>
+          <option value="Transport">Layer 4 — Transport & Security (6 Cases)</option>
+          <option value="Application">Layer 7 — Services (6 Cases)</option>
+        </select>
+      </div>
+
+      <div class="selector-item flex-grow">
+        <label for="select-case">Select Problem Scenario:</label>
+        <select id="select-case"></select>
+      </div>
+    </div>
+
+    <!-- Main Two-Column Workspace -->
+    <main class="workspace-grid">
+
+      <!-- LEFT COLUMN: 1. Network Symptoms & CLI Input -->
+      <section class="panel-card">
+        <div class="panel-header">
+          <h2>1️⃣ Network Symptoms & CLI Output</h2>
+          <span id="case-id-badge" class="badge badge-primary">LIVE-FEED</span>
+        </div>
+
+        <!-- Problem Summary Box -->
+        <div class="info-card">
+          <div class="info-row">
+            <span class="section-tag tag-symptom">🚨 Observed Problem</span>
+            <p id="symptom-text" class="info-text">Capturing live network anomaly from your active Cisco Packet Tracer terminal...</p>
+          </div>
+          <div class="info-row" style="margin-top: 0.8rem;">
+            <span class="section-tag tag-topology">🗺️ Topology Note</span>
+            <p id="topology-text" class="info-subtext">Cisco Packet Tracer live lab session.</p>
+          </div>
+        </div>
+
+        <!-- Terminal Show Outputs Box -->
+        <div class="terminal-container">
+          <div class="terminal-header">
+            <div class="terminal-dots">
+              <span class="dot red"></span>
+              <span class="dot yellow"></span>
+              <span class="dot green"></span>
+            </div>
+            <span class="terminal-title">Cisco IOS CLI Show Output</span>
+            <button id="btn-copy-cli" class="btn-xs">📋 Copy</button>
+          </div>
+          <textarea id="cli-textarea" class="terminal-body" placeholder="Cisco CLI text will appear here automatically when copied in Packet Tracer..."></textarea>
+        </div>
+
+        <!-- Action Button -->
+        <button id="btn-diagnose" class="btn-primary-action">
+          🚀 Ask NetSage AI to Diagnose & Fix
+        </button>
+      </section>
+
+      <!-- RIGHT COLUMN: 2. AI Diagnosis & Actionable Fix -->
+      <section class="panel-card">
+        <div class="panel-header">
+          <h2>2️⃣ NetSage AI Diagnosis & Fix</h2>
+          <span id="layer-badge" class="badge badge-layer">Layer Auto-Detect</span>
+        </div>
+
+        <!-- Empty Placeholder State -->
+        <div id="ai-empty-state" class="empty-state">
+          <div class="empty-icon">🤖</div>
+          <h3>Ready to Diagnose</h3>
+          <p>Click <b>'Ask NetSage AI to Diagnose & Fix'</b> to analyze the Cisco CLI outputs, isolate the root cause, and generate exact fix commands.</p>
+        </div>
+
+        <!-- Active Diagnosis Content -->
+        <div id="ai-diagnosis-content" class="diagnosis-content hidden">
+
+          <!-- Root Cause Explained Card -->
+          <div class="root-cause-card">
+            <div class="root-cause-top">
+              <span class="section-tag tag-cause">Root Cause Explained</span>
+              <div class="conf-meter">
+                <span class="conf-label">Confidence:</span>
+                <strong id="ai-confidence">90%</strong>
+              </div>
+            </div>
+            <h3 id="ai-root-cause" class="root-cause-title">Analyzing...</h3>
+          </div>
+
+          <!-- CLI Evidence Excerpt -->
+          <div class="evidence-collapsible">
+            <details>
+              <summary>🔍 Exact CLI Evidence Quoted by AI</summary>
+              <pre id="ai-evidence-text" class="evidence-code"></pre>
+            </details>
+          </div>
+
+          <!-- Step-by-Step Cisco IOS Fix Steps -->
+          <div class="fix-section">
+            <h4 class="section-title">🛠️ Step-by-Step Fix (Copy to Packet Tracer)</h4>
+            <div id="fix-steps-list" class="fix-list"></div>
+          </div>
+
+          <!-- Verification Commands -->
+          <div class="verify-section">
+            <details open>
+              <summary>🧪 Verification Commands (Test in Packet Tracer)</summary>
+              <div id="verify-commands-list" class="verify-list"></div>
+            </details>
+          </div>
+
+          <!-- 3. Student Approval Gate -->
+          <div class="approval-gate">
+            <h4>3️⃣ Student Approval Gate (HITL)</h4>
+            <p class="approval-subtext">As a network engineer, do you approve this fix?</p>
+            <div class="approval-buttons">
+              <button id="btn-accept-fix" class="btn-approve">👍 Looks Good (Apply Fix)</button>
+              <button id="btn-edit-fix" class="btn-edit">✏️ Adjust Fix</button>
+              <button id="btn-report-fix" class="btn-reject">👎 Report Issue</button>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Bottom Collapsible: Instructor & Research Telemetry -->
+    <footer class="telemetry-drawer">
+      <details>
+        <summary>🔬 Instructor & Research Telemetry (RQ2 & RQ3)</summary>
+        <div class="telemetry-content">
+          
+          <div class="telemetry-grid">
+            <div class="telemetry-stat">
+              <span class="stat-label">Inference Latency (Δt)</span>
+              <strong id="stat-latency">-- ms</strong>
+            </div>
+            <div class="telemetry-stat">
+              <span class="stat-label">Throughput Speed</span>
+              <strong id="stat-throughput">-- t/s</strong>
+            </div>
+            <div class="telemetry-stat">
+              <span class="stat-label">Output Tokens</span>
+              <strong id="stat-tokens">--</strong>
+            </div>
+            <div class="telemetry-stat">
+              <span class="stat-label">Process RAM (RSS)</span>
+              <strong id="stat-ram">-- MB</strong>
+            </div>
+          </div>
+
+          <div style="margin-top: 1.2rem;">
+            <h5 style="color: var(--text-primary); margin-bottom: 0.5rem;">Deterministic Rules Triggered:</h5>
+            <div id="rules-list" class="rules-chips">No rules evaluated yet.</div>
+          </div>
+
+        </div>
+      </details>
+    </footer>
+
+  </div>
+
+  <!-- Modal: Adjust Fix -->
+  <div id="modal-adjust" class="modal-overlay hidden">
+    <div class="modal-card">
+      <h3>✏️ Adjust Fix Commands</h3>
+      <p>Edit the Cisco IOS configuration commands before approving:</p>
+      <textarea id="modal-edit-textarea" rows="6" class="modal-textarea"></textarea>
+      <input type="text" id="modal-edit-notes" placeholder="Reason for adjustment (e.g. Added 'no shutdown')" class="modal-input">
+      <div class="modal-actions">
+        <button id="btn-cancel-edit" class="btn-ghost">Cancel</button>
+        <button id="btn-save-edit" class="btn-primary-action" style="margin: 0; padding: 0.6rem 1.2rem;">Save Adjusted Fix</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Report Error -->
+  <div id="modal-report" class="modal-overlay hidden">
+    <div class="modal-card">
+      <h3>👎 Report AI Diagnosis Issue</h3>
+      <p>Categorize the failure mode for responsible AI evaluation:</p>
+      <select id="modal-report-category" class="modal-select">
+        <option value="Incorrect Root Cause Diagnosis (Misattributed fault)">Incorrect Root Cause Diagnosis (Misattributed fault)</option>
+        <option value="Hallucinated CLI Evidence (Model quoted line not in show output)">Hallucinated CLI Evidence (Model quoted line not in show output)</option>
+        <option value="Missed Subnet Mask Boundary (Model miscalculated host/subnet alignment)">Missed Subnet Mask Boundary (Model miscalculated host/subnet alignment)</option>
+        <option value="Wrong OSI Layer Identification (e.g., tagged L2 issue as L3)">Wrong OSI Layer Identification (e.g., tagged L2 issue as L3)</option>
+        <option value="Unsafe / Invalid Remediation Step (CLI command syntax invalid in Cisco IOS)">Unsafe / Invalid Remediation Step (CLI command syntax invalid in Cisco IOS)</option>
+      </select>
+      <input type="text" id="modal-report-notes" placeholder="Additional details (e.g. Quoted wrong switch interface)" class="modal-input" style="margin-top: 0.8rem;">
+      <div class="modal-actions">
+        <button id="btn-cancel-report" class="btn-ghost">Cancel</button>
+        <button id="btn-save-report" class="btn-reject" style="margin: 0; padding: 0.6rem 1.2rem;">Submit Report</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
