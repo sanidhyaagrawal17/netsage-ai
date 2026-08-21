@@ -3,291 +3,198 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NetSage AI — Network Diagnostic Copilot</title>
+  <title>NetSage AI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 
-  <!-- Top Minimalist Navigation Bar -->
-  <header class="navbar">
+  <!-- Minimalist Top Navigation -->
+  <nav class="top-nav">
     <div class="nav-left">
-      <div class="brand">
-        <span class="brand-icon">⚡</span>
-        <span class="brand-name">NetSage</span>
-        <span class="brand-badge">AIOps</span>
-      </div>
-
-      <!-- Live Sync Status Capsule -->
-      <div id="live-capsule" class="status-capsule capsule-active" title="Packet Tracer Clipboard Listener Status">
-        <span class="capsule-dot"></span>
-        <span id="capsule-text" class="capsule-text">Packet Tracer Sync: Active</span>
-        <span id="capsule-time" class="capsule-meta">0s ago</span>
-      </div>
+      <div class="brand">NetSage</div>
+    </div>
+    
+    <div class="nav-center">
+      <button class="nav-tab active" data-target="tab-input">Input</button>
+      <button class="nav-tab" data-target="tab-diagnosis" id="tab-btn-diagnosis">Diagnosis</button>
+      <button class="nav-tab" data-target="tab-telemetry">Telemetry</button>
     </div>
 
     <div class="nav-right">
-      <!-- Mode Segmented Switcher -->
-      <div class="segmented-control">
-        <button id="btn-mode-live" class="seg-btn active">⚡ Live CLI Feed</button>
-        <button id="btn-mode-guided" class="seg-btn">📚 Practice Cases (30)</button>
+      <div id="live-indicator" class="live-indicator active">
+        <span class="live-dot"></span>
+        <span id="live-text" class="live-text">Live Sync</span>
       </div>
-
-      <!-- Theme Switcher -->
-      <button id="theme-toggle" class="btn-icon" title="Toggle Theme (Dark / Light)">
-        <span id="theme-icon">☀️</span>
-      </button>
-    </div>
-  </header>
-
-  <!-- Guided Mode Filter Ribbon (Visible only in Guided Mode) -->
-  <div id="guided-bar" class="guided-ribbon hidden">
-    <div class="ribbon-group">
-      <span class="ribbon-label">Domain:</span>
-      <select id="filter-layer" class="select-sm">
-        <option value="All">All Domains (30 Cases)</option>
-        <option value="Data Link">Layer 2 (Switching/STP/VLAN)</option>
-        <option value="Network">Layer 3 (Routing/OSPF/IP)</option>
-        <option value="Transport">Layer 4 (ACLs/Security/NAT)</option>
-        <option value="Application">Layer 7 (DHCP/DNS/Services)</option>
+      
+      <!-- Mode Toggle -->
+      <select id="mode-select" class="clean-select">
+        <option value="live">Live Mode</option>
+        <option value="guided">Practice Cases</option>
       </select>
-    </div>
 
-    <div class="ribbon-group flex-1">
-      <span class="ribbon-label">Scenario:</span>
-      <select id="select-case" class="select-sm select-wide"></select>
+      <button id="theme-toggle" class="icon-btn" title="Toggle Theme">🌓</button>
+    </div>
+  </nav>
+
+  <!-- Guided Mode Selector (Only visible in guided mode) -->
+  <div id="guided-bar" class="guided-bar hidden">
+    <div class="content-wrapper">
+      <select id="filter-layer" class="clean-select text-muted">
+        <option value="All">All Domains</option>
+        <option value="Data Link">Layer 2</option>
+        <option value="Network">Layer 3</option>
+        <option value="Transport">Layer 4</option>
+        <option value="Application">Layer 7</option>
+      </select>
+      <select id="select-case" class="clean-select flex-1"></select>
     </div>
   </div>
 
-  <!-- Main Workspace -->
-  <main class="workbench-container">
+  <!-- Main Content Area -->
+  <main class="main-content">
     
-    <!-- Tab Navigation -->
-    <nav class="workspace-tabs">
-      <button class="tab-btn active" data-target="tab-terminal">
-        <span class="tab-icon">💻</span> Terminal & Input
-      </button>
-      <button class="tab-btn" data-target="tab-diagnosis" id="tab-btn-diagnosis">
-        <span class="tab-icon">🧠</span> AI Diagnosis & Fix
-      </button>
-      <button class="tab-btn" data-target="tab-telemetry">
-        <span class="tab-icon">🔬</span> Advanced Telemetry
-      </button>
-    </nav>
-
-    <!-- Tab Content Area -->
-    <div class="tab-content-area">
-
-      <!-- TAB 1: TERMINAL & INPUT -->
-      <section id="tab-terminal" class="tab-pane active">
+    <!-- TAB 1: INPUT -->
+    <section id="tab-input" class="tab-pane active">
+      <div class="content-wrapper">
         
-        <!-- Panel Header & Incident Meta -->
-        <div class="panel-topbar">
-          <div class="panel-heading">
-            <h3>Network Telemetry & CLI Buffer</h3>
-          </div>
-          <span id="case-badge" class="pill-badge pill-live">LIVE PT SESSION</span>
+        <div class="meta-section">
+          <p class="meta-label">Symptom</p>
+          <p id="symptom-text" class="meta-value">Capturing live network anomaly from your active Cisco Packet Tracer terminal...</p>
+          <p id="topology-text" class="meta-sub">Cisco Packet Tracer live lab session.</p>
         </div>
 
-        <!-- Problem Context Capsule -->
-        <div class="context-box">
-          <div class="context-line">
-            <span class="context-tag tag-sym">Symptom</span>
-            <span id="symptom-text" class="context-val">Capturing live network anomaly from your active Cisco Packet Tracer terminal...</span>
-          </div>
-          <div class="context-line">
-            <span class="context-tag tag-top">Topology</span>
-            <span id="topology-text" class="context-sub">Cisco Packet Tracer live lab session.</span>
-          </div>
-        </div>
-
-        <!-- Sleek Terminal Editor -->
-        <div class="terminal-shell">
-          <div class="shell-bar">
-            <div class="shell-dots">
-              <span></span><span></span><span></span>
-            </div>
-            <span class="shell-title">cisco-ios-cli — show output</span>
-            <div class="shell-actions">
-              <button id="btn-clear-cli" class="shell-btn" title="Clear Terminal">Clear</button>
-              <button id="btn-copy-cli" class="shell-btn" title="Copy CLI text">Copy</button>
+        <div class="editor-container">
+          <div class="editor-header">
+            <span class="editor-title">cisco-ios-cli</span>
+            <div class="editor-actions">
+              <button id="btn-clear-cli" class="editor-btn">Clear</button>
+              <button id="btn-copy-cli" class="editor-btn">Copy</button>
             </div>
           </div>
-          <textarea id="cli-textarea" class="shell-editor" spellcheck="false" placeholder="# Waiting for Packet Tracer CLI capture...&#10;# 1. Start 'python pt_listener.py' in a terminal.&#10;# 2. Copy any show-command output in Packet Tracer (e.g. 'show ip int brief')."></textarea>
+          <textarea id="cli-textarea" class="editor-textarea" spellcheck="false" placeholder="# Waiting for Packet Tracer CLI capture..."></textarea>
         </div>
 
-        <!-- Primary Action Bar -->
-        <div class="action-footer">
-          <button id="btn-diagnose" class="btn-diagnose">
-            <span class="btn-icon-symbol">⚡</span>
-            <span class="btn-text">Run Diagnostic Engine</span>
-            <span class="btn-shortcut">Ctrl + Enter</span>
+        <div class="action-row">
+          <button id="btn-diagnose" class="primary-btn">
+            Run Diagnostic Engine <span>↵</span>
           </button>
         </div>
 
-      </section>
+      </div>
+    </section>
 
-      <!-- TAB 2: AI DIAGNOSIS & FIX -->
-      <section id="tab-diagnosis" class="tab-pane">
+    <!-- TAB 2: DIAGNOSIS -->
+    <section id="tab-diagnosis" class="tab-pane">
+      <div class="content-wrapper">
         
-        <div class="panel-topbar">
-          <div class="panel-heading">
-            <h3>NetSage AI Remediation Plan</h3>
-          </div>
-          <div id="diag-status-badge" class="pill-badge pill-neutral">STANDBY</div>
+        <div id="ai-empty-state" class="empty-state">
+          <p>No diagnosis run yet. Return to Input to analyze a trace.</p>
         </div>
 
-        <!-- Empty Standby View -->
-        <div id="ai-empty-state" class="empty-workbench">
-          <div class="empty-art">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <path d="M12 16v-4"></path>
-              <path d="M12 8h.01"></path>
-            </svg>
-          </div>
-          <h4>No Diagnostic Run Yet</h4>
-          <p>Return to the <b>Terminal & Input</b> tab to run the diagnostic engine.</p>
-        </div>
-
-        <!-- Active Diagnostic Viewport -->
-        <div id="ai-diagnosis-content" class="diag-viewport hidden">
+        <div id="ai-diagnosis-content" class="diagnosis-content hidden">
           
-          <!-- Root Cause Banner -->
-          <div class="verdict-banner">
-            <div class="verdict-header">
-              <span class="verdict-tag">ROOT CAUSE ISOLATED</span>
-              <div class="verdict-metrics">
-                <span id="layer-badge" class="metric-pill">Layer 2</span>
-                <span id="ai-confidence" class="metric-pill metric-conf">95% Conf</span>
-              </div>
+          <header class="diag-header">
+            <div class="diag-meta">
+              <span id="layer-badge">Layer 2</span>
+              <span class="dot-sep">•</span>
+              <span id="ai-confidence">95% Confidence</span>
             </div>
-            <h2 id="ai-root-cause" class="verdict-title">VLAN mismatch discovered on trunk link.</h2>
-          </div>
+            <h1 id="ai-root-cause" class="diag-title">VLAN Mismatch</h1>
+          </header>
 
-          <!-- Evidence Snippet -->
-          <div class="evidence-wrapper">
-            <div class="evidence-header">
-              <span>Quoted Evidence from CLI</span>
-            </div>
-            <pre id="ai-evidence-text" class="evidence-body"></pre>
-          </div>
+          <section class="diag-section">
+            <h3 class="section-title">Evidence</h3>
+            <pre id="ai-evidence-text" class="evidence-block"></pre>
+          </section>
 
-          <!-- Remediation Plan -->
-          <div class="remediation-box">
-            <div class="remediation-header">
-              <h4>🛠️ Actionable Remediation Steps</h4>
-              <button id="btn-copy-all-fixes" class="btn-link">Copy All</button>
+          <section class="diag-section">
+            <div class="section-header">
+              <h3 class="section-title">Remediation Steps</h3>
+              <button id="btn-copy-all-fixes" class="editor-btn">Copy All</button>
             </div>
-            <div id="fix-steps-list" class="steps-container"></div>
-          </div>
+            <div id="fix-steps-list" class="steps-list"></div>
+          </section>
 
-          <!-- Verification Commands -->
-          <div class="verification-box">
-            <div class="verification-header">
-              <span>🧪 Verification Commands</span>
-            </div>
-            <div id="verify-commands-list" class="verify-container"></div>
-          </div>
+          <section class="diag-section">
+            <h3 class="section-title">Verification</h3>
+            <div id="verify-commands-list" class="verify-list"></div>
+          </section>
 
-          <!-- Human-in-the-Loop Review Gate -->
-          <div class="approval-card">
-            <div class="approval-info">
-              <h4>Human-in-the-Loop Safety Gate</h4>
-              <p>Approve or adjust this remediation before executing on devices:</p>
-            </div>
-            <div class="approval-btns">
-              <button id="btn-accept-fix" class="btn-gate btn-gate-accept">✓ Approve Fix</button>
-              <button id="btn-edit-fix" class="btn-gate btn-gate-edit">✎ Edit Fix</button>
-              <button id="btn-report-fix" class="btn-gate btn-gate-reject">✕ Report Error</button>
-            </div>
-          </div>
+          <footer class="approval-footer">
+            <button id="btn-accept-fix" class="gate-btn accept">Approve Fix</button>
+            <button id="btn-edit-fix" class="gate-btn edit">Adjust</button>
+            <button id="btn-report-fix" class="gate-btn reject">Report Issue</button>
+          </footer>
 
         </div>
+      </div>
+    </section>
 
-      </section>
-
-      <!-- TAB 3: ADVANCED TELEMETRY -->
-      <section id="tab-telemetry" class="tab-pane">
+    <!-- TAB 3: TELEMETRY -->
+    <section id="tab-telemetry" class="tab-pane">
+      <div class="content-wrapper">
         
-        <div class="panel-topbar">
-          <div class="panel-heading">
-            <h3>Diagnostic Telemetry & Rule Execution (RQ2 & RQ3)</h3>
+        <div class="metrics-grid">
+          <div class="metric-item">
+            <span class="metric-label">Latency (Δt)</span>
+            <span id="stat-latency" class="metric-value">-- ms</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Throughput</span>
+            <span id="stat-throughput" class="metric-value">-- t/s</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Tokens</span>
+            <span id="stat-tokens" class="metric-value">--</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">RAM (RSS)</span>
+            <span id="stat-ram" class="metric-value">-- MB</span>
           </div>
         </div>
 
-        <div class="telemetry-grid">
-          <div class="telemetry-card">
-            <span class="tc-label">Inference Latency (Δt)</span>
-            <strong id="stat-latency" class="tc-val">-- ms</strong>
+        <section class="diag-section" style="margin-top: 4rem;">
+          <h3 class="section-title">Deterministic Rules Triggered</h3>
+          <div id="rules-list" class="rules-list">
+            <p class="text-muted">No rules evaluated yet.</p>
           </div>
-          <div class="telemetry-card">
-            <span class="tc-label">Throughput Speed</span>
-            <strong id="stat-throughput" class="tc-val">-- t/s</strong>
-          </div>
-          <div class="telemetry-card">
-            <span class="tc-label">Output Tokens</span>
-            <strong id="stat-tokens" class="tc-val">--</strong>
-          </div>
-          <div class="telemetry-card">
-            <span class="tc-label">Process RAM (RSS)</span>
-            <strong id="stat-ram" class="tc-val">-- MB</strong>
-          </div>
-        </div>
+        </section>
 
-        <div class="rules-container">
-          <div class="rules-header">
-            <h4>Deterministic Rules Triggered</h4>
-            <span id="rules-summary" class="rules-badge">0 Flagged</span>
-          </div>
-          <div id="rules-list" class="rules-chips">
-            <span class="empty-rules-text">No rules evaluated yet.</span>
-          </div>
-        </div>
+      </div>
+    </section>
 
-      </section>
-
-    </div>
   </main>
 
-  <!-- Modal: Adjust Fix -->
-  <div id="modal-adjust" class="modal-overlay hidden">
-    <div class="modal-window">
-      <div class="modal-head">
-        <h3>Adjust Remediation Commands</h3>
-        <button id="btn-close-edit" class="modal-close">✕</button>
-      </div>
-      <p class="modal-desc">Edit the Cisco IOS configuration commands before logging approval:</p>
-      <textarea id="modal-edit-textarea" rows="6" class="modal-field"></textarea>
-      <input type="text" id="modal-edit-notes" placeholder="Notes for review log (e.g. Added 'no shutdown')" class="modal-field">
-      <div class="modal-foot">
-        <button id="btn-cancel-edit" class="btn-sec">Cancel</button>
-        <button id="btn-save-edit" class="btn-prim">Save & Approve</button>
+  <!-- Modals -->
+  <div id="modal-adjust" class="modal-backdrop hidden">
+    <div class="modal-box">
+      <h2>Adjust Remediation</h2>
+      <textarea id="modal-edit-textarea" class="modal-textarea"></textarea>
+      <input type="text" id="modal-edit-notes" class="modal-input" placeholder="Notes for review log">
+      <div class="modal-actions">
+        <button id="btn-cancel-edit" class="gate-btn edit">Cancel</button>
+        <button id="btn-save-edit" class="gate-btn accept">Save & Approve</button>
       </div>
     </div>
   </div>
 
-  <!-- Modal: Report Error -->
-  <div id="modal-report" class="modal-overlay hidden">
-    <div class="modal-window">
-      <div class="modal-head">
-        <h3>Report Diagnostic Error</h3>
-        <button id="btn-close-report" class="modal-close">✕</button>
-      </div>
-      <p class="modal-desc">Select the primary failure mode for the Responsible AI audit log:</p>
-      <select id="modal-report-category" class="modal-field">
-        <option value="Incorrect Root Cause Diagnosis (Misattributed fault)">Incorrect Root Cause Diagnosis (Misattributed fault)</option>
-        <option value="Hallucinated CLI Evidence (Model quoted line not in show output)">Hallucinated CLI Evidence (Model quoted line not in show output)</option>
-        <option value="Missed Subnet Mask Boundary (Model miscalculated host/subnet alignment)">Missed Subnet Mask Boundary (Model miscalculated host/subnet alignment)</option>
-        <option value="Wrong OSI Layer Identification (e.g., tagged L2 issue as L3)">Wrong OSI Layer Identification (e.g., tagged L2 issue as L3)</option>
-        <option value="Unsafe / Invalid Remediation Step (CLI command syntax invalid in Cisco IOS)">Unsafe / Invalid Remediation Step (CLI command syntax invalid in Cisco IOS)</option>
+  <div id="modal-report" class="modal-backdrop hidden">
+    <div class="modal-box">
+      <h2>Report Issue</h2>
+      <select id="modal-report-category" class="modal-input">
+        <option>Incorrect Root Cause Diagnosis</option>
+        <option>Hallucinated CLI Evidence</option>
+        <option>Missed Subnet Mask Boundary</option>
+        <option>Wrong OSI Layer Identification</option>
+        <option>Unsafe / Invalid Remediation Step</option>
       </select>
-      <input type="text" id="modal-report-notes" placeholder="Provide feedback context..." class="modal-field">
-      <div class="modal-foot">
-        <button id="btn-cancel-report" class="btn-sec">Cancel</button>
-        <button id="btn-save-report" class="btn-danger">Submit Rejection</button>
+      <input type="text" id="modal-report-notes" class="modal-input" placeholder="Provide context...">
+      <div class="modal-actions">
+        <button id="btn-cancel-report" class="gate-btn edit">Cancel</button>
+        <button id="btn-save-report" class="gate-btn reject">Submit</button>
       </div>
     </div>
   </div>
