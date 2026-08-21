@@ -2,7 +2,7 @@
 
 Features:
 - Seamless High-Contrast 🌙 Dark Mode / ☀️ Light Mode
-- Complete Text & Widget Color Overrides (100% readable white text on dark surfaces)
+- Pixel-Perfect Code & Terminal Styling (Deep Midnight Slate `#020617` with `#38BDF8` & `#F8FAFC` text)
 - Live Packet Tracer Sync Indicator (pulsing real-time radar badge)
 - Student-friendly plain English diagnostic explanations
 - Copyable Cisco IOS fix commands & verification steps
@@ -78,9 +78,9 @@ if is_dark:
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap');
     
     /* 1. Global Reset & Universal Dark Text Colors */
-    html, body, [class*="css"], .stApp, .main {
+    html, body, [class*="css"], .stApp, .main, [data-testid="stAppViewContainer"] {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
-        background-color: #0B0F19 !important;
+        background-color: #080C14 !important;
         color: #F8FAFC !important;
     }
     
@@ -96,7 +96,7 @@ if is_dark:
     }
 
     /* Subtext & Captions */
-    small, .stCaption, div[data-testid="stCaptionContainer"] {
+    small, .stCaption, div[data-testid="stCaptionContainer"], div[data-testid="stCaptionContainer"] p {
         color: #94A3B8 !important;
     }
 
@@ -140,8 +140,8 @@ if is_dark:
         color: #F0FDF4 !important;
     }
     .live-status-offline {
-        background: #1E293B !important;
-        border: 1.5px solid #475569 !important;
+        background: #131B2E !important;
+        border: 1.5px solid #334155 !important;
         border-radius: 12px;
         padding: 1rem 1.3rem;
         margin-bottom: 1.2rem;
@@ -168,12 +168,12 @@ if is_dark:
 
     /* 4. Diagnosis & Problem Cards */
     .diagnosis-card {
-        background: #131B2E !important;
-        border: 1px solid #1E293B !important;
+        background: #111827 !important;
+        border: 1px solid #1F2937 !important;
         border-radius: 12px;
         padding: 1.4rem;
         margin-bottom: 1rem;
-        box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+        box-shadow: 0 4px 14px rgba(0,0,0,0.3);
     }
     .diagnosis-card p, .diagnosis-card h4, .diagnosis-card div, .diagnosis-card strong {
         color: #F8FAFC !important;
@@ -190,14 +190,14 @@ if is_dark:
         border-radius: 6px;
         margin-bottom: 0.5rem;
     }
-    .tag-cause { background: #581C87 !important; color: #E9D5FF !important; border: 1px solid #9333EA !important; }
+    .tag-cause { background: #4C0519 !important; color: #FECDD3 !important; border: 1px solid #E11D48 !important; }
     .tag-fix { background: #064E3B !important; color: #A7F3D0 !important; border: 1px solid #10B981 !important; }
     .tag-verify { background: #1E3A8A !important; color: #BFDBFE !important; border: 1px solid #3B82F6 !important; }
     .tag-tip { background: #78350F !important; color: #FDE68A !important; border: 1px solid #D97706 !important; }
     
     /* Step Items */
     .step-item {
-        background: #0F172A !important;
+        background: #111827 !important;
         border-left: 4px solid #38BDF8 !important;
         padding: 0.75rem 1.1rem;
         border-radius: 0 8px 8px 0;
@@ -208,10 +208,37 @@ if is_dark:
         color: #38BDF8 !important;
     }
 
-    /* 5. Streamlit Sidebar & Controls */
+    /* 5. CRITICAL FIX: Code & Terminal Boxes in Dark Mode */
+    pre, code, 
+    div[data-testid="stCode"] pre, 
+    div[data-testid="stCode"] code,
+    div[data-testid="stCodeBlock"] pre,
+    div[data-testid="stCodeBlock"] code,
+    .stCode pre, .stCode code {
+        background-color: #030712 !important;
+        color: #38BDF8 !important;
+        border: 1px solid #1F2937 !important;
+        border-radius: 8px !important;
+        font-family: 'Fira Code', monospace !important;
+    }
+    
+    pre code span, div[data-testid="stCode"] span {
+        color: #F8FAFC !important;
+    }
+    
+    /* Inline code snippet */
+    p code, li code {
+        background-color: #1F2937 !important;
+        color: #38BDF8 !important;
+        padding: 0.15rem 0.4rem !important;
+        border-radius: 4px !important;
+        border: 1px solid #374151 !important;
+    }
+
+    /* 6. Sidebar & Streamlit Controls */
     [data-testid="stSidebar"] {
-        background-color: #0F172A !important;
-        border-right: 1px solid #1E293B !important;
+        background-color: #0B0F19 !important;
+        border-right: 1px solid #1F2937 !important;
     }
     [data-testid="stSidebar"] * {
         color: #F8FAFC !important;
@@ -219,9 +246,9 @@ if is_dark:
     
     /* Inputs, Selectboxes, Textareas */
     .stTextInput input, .stTextArea textarea, div[data-baseweb="select"] > div {
-        background-color: #1E293B !important;
+        background-color: #111827 !important;
         color: #F8FAFC !important;
-        border: 1px solid #334155 !important;
+        border: 1px solid #374151 !important;
         border-radius: 8px !important;
     }
     div[data-baseweb="select"] * {
@@ -233,6 +260,24 @@ if is_dark:
         color: #F8FAFC !important;
     }
 
+    /* Buttons */
+    button[kind="primary"] {
+        background: linear-gradient(135deg, #2563EB 0%, #4F46E5 100%) !important;
+        border: none !important;
+        color: #FFFFFF !important;
+        font-weight: 600 !important;
+        box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3) !important;
+    }
+    button[kind="secondary"] {
+        background-color: #111827 !important;
+        border: 1px solid #374151 !important;
+        color: #F8FAFC !important;
+    }
+    button[kind="secondary"]:hover {
+        background-color: #1F2937 !important;
+        border-color: #4B5563 !important;
+    }
+
     /* Metrics & Expanders */
     div[data-testid="stMetricValue"] {
         color: #38BDF8 !important;
@@ -241,17 +286,25 @@ if is_dark:
         color: #94A3B8 !important;
     }
     div[data-testid="stExpander"] {
-        background-color: #131B2E !important;
-        border: 1px solid #1E293B !important;
+        background-color: #111827 !important;
+        border: 1px solid #1F2937 !important;
         border-radius: 10px !important;
+    }
+    div[data-testid="stExpander"] summary {
+        color: #F8FAFC !important;
     }
     div[data-testid="stExpander"] * {
         color: #F8FAFC !important;
     }
 
-    /* Code Blocks */
-    code, pre {
-        color: #38BDF8 !important;
+    /* Popovers */
+    div[data-testid="stPopoverBody"] {
+        background-color: #111827 !important;
+        border: 1px solid #374151 !important;
+        color: #F8FAFC !important;
+    }
+    div[data-testid="stPopoverBody"] * {
+        color: #F8FAFC !important;
     }
     </style>
     """
@@ -571,7 +624,7 @@ with col_right:
         vcmds = diag.get("verification_commands", [])
         quote = diag.get("cli_evidence_quote", "")
 
-        cause_color = "#FCA5A5" if is_dark else "#991B1B"
+        cause_color = "#FECDD3" if is_dark else "#991B1B"
         st.markdown(
             f"""
             <div class="diagnosis-card" style="border-left: 5px solid #EF4444;">
@@ -589,7 +642,7 @@ with col_right:
 
         if quote and quote != "N/A":
             with st.expander("🔍 See Exact CLI Evidence Quoted by AI", expanded=True):
-                st.markdown(f"```text\n{quote}\n```")
+                st.code(quote, language="text")
 
         st.markdown("#### 🛠️ Step-by-Step Fix (Copy & Paste to Packet Tracer)")
         step_header_color = "#38BDF8" if is_dark else "#1E40AF"
