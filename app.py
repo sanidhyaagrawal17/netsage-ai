@@ -1,6 +1,7 @@
 """NetSage AI - Student-Centric AIOps Lab Copilot & Packet Tracer Assistant.
 
-Designed for network students and lab engineers with:
+Features:
+- Seamless 🌙 Dark Mode / ☀️ Light Mode Theme Toggle
 - Live Packet Tracer Sync Indicator (pulsing real-time radar badge)
 - Student-friendly plain English diagnostic explanations
 - Copyable Cisco IOS fix commands & verification steps
@@ -32,15 +33,169 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Custom Student-Friendly & High-Contrast CSS
-st.markdown(
-    """
+BASE_DIR = Path(__file__).resolve().parent
+CASES_FILE = BASE_DIR / "cases.csv"
+PROMPT_FILE = BASE_DIR / "diagnose_prompt.md"
+LIVE_INPUT_FILE = BASE_DIR / "live_cli_input.txt"
+RESPONSIBLE_LOG_FILE = BASE_DIR / "responsible_ai_log.csv"
+BENCHMARK_LOG_FILE = BASE_DIR / "benchmark_paper_results.csv"
+
+FAILURE_TAXONOMY = [
+    "None / Valid AI Diagnosis",
+    "Hallucinated CLI Evidence (Model quoted line not in show output)",
+    "Missed Subnet Mask Boundary (Model miscalculated host/subnet alignment)",
+    "Wrong OSI Layer Identification (e.g., tagged L2 issue as L3)",
+    "Unsafe / Invalid Remediation Step (CLI command syntax invalid in Cisco IOS)",
+    "Incorrect Root Cause Diagnosis (Misattributed fault)",
+]
+
+# --- Initialize Session State ---
+if "theme" not in st.session_state:
+    st.session_state.theme = "🌙 Dark Mode"
+if "reviews" not in st.session_state:
+    st.session_state.reviews = {}
+if "diagnoses" not in st.session_state:
+    st.session_state.diagnoses = {}
+if "rule_findings" not in st.session_state:
+    st.session_state.rule_findings = {}
+
+# --- SIDEBAR THEME SWITCHER ---
+st.sidebar.markdown("### 🎨 Appearance")
+theme_choice = st.sidebar.radio(
+    "Theme Mode",
+    options=["🌙 Dark Mode", "☀️ Light Mode"],
+    index=0 if st.session_state.theme == "🌙 Dark Mode" else 1,
+    label_visibility="collapsed",
+)
+st.session_state.theme = theme_choice
+is_dark = theme_choice == "🌙 Dark Mode"
+
+# --- THEME CSS INJECTION ---
+if is_dark:
+    theme_css = """
     <style>
-    /* Global Fonts & Theme */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap');
     
-    html, body, [class*="css"] {
+    html, body, [class*="css"], .stApp {
         font-family: 'Inter', sans-serif;
+        background-color: #0B0F19 !important;
+        color: #F1F5F9 !important;
+    }
+    
+    /* Dark Mode Copilot Header */
+    .copilot-header {
+        background: linear-gradient(135deg, #1E1B4B 0%, #312E81 50%, #4338CA 100%);
+        border: 1px solid #4F46E5;
+        color: white;
+        padding: 1.5rem 1.8rem;
+        border-radius: 14px;
+        margin-bottom: 1.2rem;
+        box-shadow: 0 4px 20px rgba(79, 70, 229, 0.25);
+    }
+    .copilot-title {
+        font-size: 2.0rem;
+        font-weight: 800;
+        margin: 0;
+        letter-spacing: -0.02em;
+        color: #FFFFFF;
+    }
+    .copilot-subtitle {
+        font-size: 1.0rem;
+        color: #C7D2FE;
+        margin-top: 0.3rem;
+        font-weight: 500;
+    }
+
+    /* Dark Live Status Card */
+    .live-status-card {
+        background: #064E3B;
+        border: 1.5px solid #059669;
+        border-radius: 12px;
+        padding: 1rem 1.3rem;
+        margin-bottom: 1.2rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: #ECFDF5;
+    }
+    .live-status-offline {
+        background: #1E293B;
+        border: 1.5px solid #334155;
+        border-radius: 12px;
+        padding: 1rem 1.3rem;
+        margin-bottom: 1.2rem;
+        color: #94A3B8;
+    }
+    .pulse-dot {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        background-color: #34D399;
+        border-radius: 50%;
+        margin-right: 8px;
+        box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7);
+        animation: pulse-dark 1.6s infinite;
+    }
+    @keyframes pulse-dark {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(52, 211, 153, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+    }
+
+    /* Dark Cards */
+    .diagnosis-card {
+        background: #131B2E;
+        border: 1px solid #1E293B;
+        border-radius: 12px;
+        padding: 1.4rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .section-tag {
+        display: inline-block;
+        font-weight: 700;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        padding: 0.25rem 0.6rem;
+        border-radius: 6px;
+        margin-bottom: 0.5rem;
+    }
+    .tag-cause { background: #450A0A; color: #FCA5A5; border: 1px solid #991B1B; }
+    .tag-fix { background: #064E3B; color: #6EE7B7; border: 1px solid #059669; }
+    .tag-verify { background: #172554; color: #93C5FD; border: 1px solid #1D4ED8; }
+    .tag-tip { background: #451A03; color: #FCD34D; border: 1px solid #B45309; }
+    
+    .step-item {
+        background: #0F172A;
+        border-left: 4px solid #38BDF8;
+        padding: 0.7rem 1rem;
+        border-radius: 0 8px 8px 0;
+        margin-bottom: 0.6rem;
+        color: #F8FAFC;
+    }
+
+    /* Dark Sidebar & Streamlit widgets */
+    [data-testid="stSidebar"] {
+        background-color: #0F172A !important;
+        border-right: 1px solid #1E293B;
+    }
+    .stTextInput > div > div > input, .stTextArea > div > div > textarea, .stSelectbox > div > div {
+        background-color: #1E293B !important;
+        color: #F8FAFC !important;
+        border-color: #334155 !important;
+    }
+    </style>
+    """
+else:
+    theme_css = """
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap');
+    
+    html, body, [class*="css"], .stApp {
+        font-family: 'Inter', sans-serif;
+        background-color: #FFFFFF !important;
+        color: #0F172A !important;
     }
     
     .copilot-header {
@@ -56,6 +211,7 @@ st.markdown(
         font-weight: 800;
         margin: 0;
         letter-spacing: -0.02em;
+        color: #FFFFFF;
     }
     .copilot-subtitle {
         font-size: 1.0rem;
@@ -64,7 +220,6 @@ st.markdown(
         font-weight: 500;
     }
 
-    /* Live Sync Radar Indicator */
     .live-status-card {
         background: #F0FDF4;
         border: 2px solid #86EFAC;
@@ -98,7 +253,6 @@ st.markdown(
         100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
     }
 
-    /* Friendly Solution Cards */
     .diagnosis-card {
         background: #FFFFFF;
         border: 1px solid #E2E8F0;
@@ -122,17 +276,6 @@ st.markdown(
     .tag-verify { background: #DBEAFE; color: #1E40AF; }
     .tag-tip { background: #FEF3C7; color: #92400E; }
     
-    .cli-box {
-        background-color: #0F172A;
-        color: #38BDF8;
-        font-family: 'Fira Code', monospace;
-        font-size: 0.9rem;
-        padding: 1rem;
-        border-radius: 8px;
-        line-height: 1.5;
-        overflow-x: auto;
-    }
-    
     .step-item {
         background: #F8FAFC;
         border-left: 4px solid #3B82F6;
@@ -141,25 +284,9 @@ st.markdown(
         margin-bottom: 0.6rem;
     }
     </style>
-    """,
-    unsafe_allow_html=True,
-)
+    """
 
-BASE_DIR = Path(__file__).resolve().parent
-CASES_FILE = BASE_DIR / "cases.csv"
-PROMPT_FILE = BASE_DIR / "diagnose_prompt.md"
-LIVE_INPUT_FILE = BASE_DIR / "live_cli_input.txt"
-RESPONSIBLE_LOG_FILE = BASE_DIR / "responsible_ai_log.csv"
-BENCHMARK_LOG_FILE = BASE_DIR / "benchmark_paper_results.csv"
-
-FAILURE_TAXONOMY = [
-    "None / Valid AI Diagnosis",
-    "Hallucinated CLI Evidence (Model quoted line not in show output)",
-    "Missed Subnet Mask Boundary (Model miscalculated host/subnet alignment)",
-    "Wrong OSI Layer Identification (e.g., tagged L2 issue as L3)",
-    "Unsafe / Invalid Remediation Step (CLI command syntax invalid in Cisco IOS)",
-    "Incorrect Root Cause Diagnosis (Misattributed fault)",
-]
+st.markdown(theme_css, unsafe_allow_html=True)
 
 
 @st.cache_data
@@ -199,14 +326,6 @@ def read_live_cli_buffer() -> Dict[str, Any]:
         return {"exists": False, "content": "", "mtime": None, "age_sec": 99999, "is_fresh": False}
 
 
-# Initialize Session State
-if "reviews" not in st.session_state:
-    st.session_state.reviews = {}
-if "diagnoses" not in st.session_state:
-    st.session_state.diagnoses = {}
-if "rule_findings" not in st.session_state:
-    st.session_state.rule_findings = {}
-
 df_cases = load_cases_data()
 live_buffer = read_live_cli_buffer()
 
@@ -222,7 +341,8 @@ st.markdown(
 )
 
 # --- SIDEBAR CONTROLS ---
-st.sidebar.markdown("### 🎯 Choose Practice Mode")
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 🎯 Practice Mode")
 mode_selection = st.sidebar.radio(
     "How do you want to troubleshoot?",
     options=["⚡ Live Packet Tracer Copilot", "📚 30 Guided Lab Scenarios"],
@@ -240,7 +360,6 @@ ollama_url = "http://localhost:11434"
 if mode_selection == "⚡ Live Packet Tracer Copilot":
     active_case_id = "LIVE-PACKET-TRACER"
     
-    # Active live feed case structure
     live_content = live_buffer["content"] if live_buffer["exists"] else ""
     if not live_content:
         live_content = (
@@ -282,17 +401,18 @@ else:
 if mode_selection == "⚡ Live Packet Tracer Copilot":
     if live_buffer["exists"] and live_buffer["is_fresh"]:
         time_str = live_buffer["mtime"].strftime("%H:%M:%S")
+        status_text_color = "#34D399" if is_dark else "#166534"
         st.markdown(
             f"""
             <div class="live-status-card">
                 <div>
                     <span class="pulse-dot"></span>
-                    <strong style="color: #166534; font-size: 1.05rem;">LIVE PACKET TRACER SYNC: ACTIVE</strong>
-                    <div style="color: #15803D; font-size: 0.88rem; margin-top: 0.2rem;">
+                    <strong style="color: {status_text_color}; font-size: 1.05rem;">LIVE PACKET TRACER SYNC: ACTIVE</strong>
+                    <div style="font-size: 0.88rem; margin-top: 0.2rem; opacity: 0.9;">
                         NetSage AI is monitoring your clipboard. Capturing Cisco CLI text exclusively.
                     </div>
                 </div>
-                <div style="text-align: right; color: #166534; font-size: 0.85rem; font-family: monospace;">
+                <div style="text-align: right; font-size: 0.85rem; font-family: monospace;">
                     Last CLI Capture: <b>{time_str}</b> ({int(live_buffer['age_sec'])}s ago)
                 </div>
             </div>
@@ -303,8 +423,8 @@ if mode_selection == "⚡ Live Packet Tracer Copilot":
         st.markdown(
             """
             <div class="live-status-offline">
-                <strong style="color: #475569; font-size: 1.05rem;">📡 Packet Tracer Listener Ready</strong>
-                <div style="color: #64748B; font-size: 0.88rem; margin-top: 0.2rem;">
+                <strong style="font-size: 1.05rem;">📡 Packet Tracer Listener Ready</strong>
+                <div style="font-size: 0.88rem; margin-top: 0.2rem; opacity: 0.85;">
                     Run <code>python pt_listener.py</code> in a terminal, then copy any CLI output in Packet Tracer (e.g. <code>show ip int brief</code>). The AI will auto-detect it!
                 </div>
             </div>
@@ -312,8 +432,7 @@ if mode_selection == "⚡ Live Packet Tracer Copilot":
             unsafe_allow_html=True,
         )
 
-# --- MAIN INTERACTIVE WORKSPACE (Clean 3-Step Student Flow) ---
-
+# --- MAIN INTERACTIVE WORKSPACE ---
 col_left, col_right = st.columns([1, 1.2], gap="medium")
 
 # LEFT COLUMN: What's Happening in the Network
@@ -321,15 +440,17 @@ with col_left:
     st.markdown("### 1️⃣ Network Symptoms & CLI Output")
     
     with st.container():
+        sub_text_color = "#94A3B8" if is_dark else "#475569"
+        main_sym_color = "#F8FAFC" if is_dark else "#1E293B"
         st.markdown(
             f"""
             <div class="diagnosis-card">
                 <span class="section-tag tag-tip">🚨 Observed Problem</span>
-                <p style="font-size: 0.98rem; font-weight: 500; color: #1E293B; margin-top: 0.4rem;">
+                <p style="font-size: 0.98rem; font-weight: 500; color: {main_sym_color}; margin-top: 0.4rem;">
                     {active_case.get('symptom')}
                 </p>
                 <span class="section-tag tag-verify">🗺️ Lab Topology Note</span>
-                <p style="font-size: 0.88rem; color: #475569; margin-top: 0.2rem;">
+                <p style="font-size: 0.88rem; color: {sub_text_color}; margin-top: 0.2rem;">
                     {active_case.get('topology_note')}
                 </p>
             </div>
@@ -340,7 +461,6 @@ with col_left:
     st.markdown("#### 💻 Captured CLI Data from Packet Tracer")
     st.code(active_case.get("show_outputs", ""), language="text")
 
-    # One-Click Big Diagnose Button
     btn_diagnose = st.button("🚀 Ask NetSage AI to Diagnose & Fix", type="primary", use_container_width=True)
     if btn_diagnose:
         with st.spinner("AI is analyzing Cisco CLI outputs and running deterministic sanity checks..."):
@@ -374,13 +494,13 @@ with col_right:
         vcmds = diag.get("verification_commands", [])
         quote = diag.get("cli_evidence_quote", "")
 
-        # 1. Root Cause in Plain English
+        cause_color = "#F87171" if is_dark else "#991B1B"
         st.markdown(
             f"""
             <div class="diagnosis-card" style="border-left: 5px solid #EF4444;">
                 <span class="section-tag tag-cause">Root Cause Explained</span>
-                <h4 style="color: #991B1B; margin: 0.3rem 0;">{root_cause}</h4>
-                <div style="font-size: 0.85rem; color: #64748B; margin-top: 0.4rem;">
+                <h4 style="color: {cause_color}; margin: 0.3rem 0;">{root_cause}</h4>
+                <div style="font-size: 0.85rem; color: #94A3B8; margin-top: 0.4rem;">
                     <b>Layer:</b> {layer} &nbsp;|&nbsp; <b>AI Confidence:</b> {conf:.0f}%
                 </div>
             </div>
@@ -388,31 +508,28 @@ with col_right:
             unsafe_allow_html=True,
         )
 
-        # 2. Evidence Quote
         if quote and quote != "N/A":
             with st.expander("🔍 See Exact CLI Evidence Quoted by AI", expanded=True):
                 st.markdown(f"```text\n{quote}\n```")
 
-        # 3. Exact Fix Steps with Copyable Commands
         st.markdown("#### 🛠️ Step-by-Step Fix (Copy & Paste to Packet Tracer)")
+        step_color = "#38BDF8" if is_dark else "#1E40AF"
         for idx, step in enumerate(fixes, 1):
             st.markdown(
                 f"""
                 <div class="step-item">
-                    <strong style="color: #1E40AF;">Step {idx}:</strong>
+                    <strong style="color: {step_color};">Step {idx}:</strong>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
             st.code(step, language="bash")
 
-        # 4. Verification Commands
         if vcmds:
             with st.expander("🧪 How to Verify Your Fix in Packet Tracer", expanded=True):
                 for v in vcmds:
                     st.code(v, language="bash")
 
-        # 5. Human-in-the-Loop Review Controls (Simple & Empowering)
         st.markdown("---")
         st.markdown("### 3️⃣ Student Approval Gate (HITL)")
         st.caption("As a network engineer, do you approve this fix before applying it?")
@@ -492,7 +609,7 @@ with col_right:
                     log_telemetry_and_audit(review_entry, str(RESPONSIBLE_LOG_FILE))
                     st.warning("Feedback Recorded in Responsible AI Log!")
 
-# --- COLLAPSIBLE ADVANCED LAB & RESEARCH TELEMETRY (For Instructors / Evaluation) ---
+# --- COLLAPSIBLE ADVANCED LAB & RESEARCH TELEMETRY ---
 st.markdown("---")
 with st.expander("🔬 Instructor / Advanced Research Telemetry & Rules"):
     st.markdown("#### Deterministic Rule Engine Anomalies Triggered")
