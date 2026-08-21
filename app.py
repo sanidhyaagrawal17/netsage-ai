@@ -1,7 +1,8 @@
 """NetSage AI - Student-Centric AIOps Lab Copilot & Packet Tracer Assistant.
 
 Features:
-- Seamless 🌙 Dark Mode / ☀️ Light Mode Theme Toggle
+- Seamless High-Contrast 🌙 Dark Mode / ☀️ Light Mode
+- Complete Text & Widget Color Overrides (100% readable white text on dark surfaces)
 - Live Packet Tracer Sync Indicator (pulsing real-time radar badge)
 - Student-friendly plain English diagnostic explanations
 - Copyable Cisco IOS fix commands & verification steps
@@ -70,61 +71,84 @@ theme_choice = st.sidebar.radio(
 st.session_state.theme = theme_choice
 is_dark = theme_choice == "🌙 Dark Mode"
 
-# --- THEME CSS INJECTION ---
+# --- COMPREHENSIVE THEME CSS INJECTION ---
 if is_dark:
     theme_css = """
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap');
     
-    html, body, [class*="css"], .stApp {
-        font-family: 'Inter', sans-serif;
+    /* 1. Global Reset & Universal Dark Text Colors */
+    html, body, [class*="css"], .stApp, .main {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
         background-color: #0B0F19 !important;
-        color: #F1F5F9 !important;
+        color: #F8FAFC !important;
     }
     
-    /* Dark Mode Copilot Header */
+    /* Universal Text Overrides for Streamlit Elements */
+    div[data-testid="stMarkdownContainer"] p,
+    div[data-testid="stMarkdownContainer"] span,
+    div[data-testid="stMarkdownContainer"] li,
+    div[data-testid="stMarkdownContainer"] div,
+    label[data-testid="stWidgetLabel"] p,
+    label[data-testid="stWidgetLabel"] span,
+    .stMarkdown, p, span, label, h1, h2, h3, h4, h5, h6 {
+        color: #F8FAFC !important;
+    }
+
+    /* Subtext & Captions */
+    small, .stCaption, div[data-testid="stCaptionContainer"] {
+        color: #94A3B8 !important;
+    }
+
+    /* 2. Top Copilot Header */
     .copilot-header {
-        background: linear-gradient(135deg, #1E1B4B 0%, #312E81 50%, #4338CA 100%);
-        border: 1px solid #4F46E5;
-        color: white;
+        background: linear-gradient(135deg, #1E1B4B 0%, #312E81 50%, #4338CA 100%) !important;
+        border: 1px solid #6366F1 !important;
+        color: #FFFFFF !important;
         padding: 1.5rem 1.8rem;
         border-radius: 14px;
         margin-bottom: 1.2rem;
-        box-shadow: 0 4px 20px rgba(79, 70, 229, 0.25);
+        box-shadow: 0 6px 24px rgba(99, 102, 241, 0.25);
     }
     .copilot-title {
         font-size: 2.0rem;
         font-weight: 800;
         margin: 0;
         letter-spacing: -0.02em;
-        color: #FFFFFF;
+        color: #FFFFFF !important;
     }
     .copilot-subtitle {
         font-size: 1.0rem;
-        color: #C7D2FE;
+        color: #E0E7FF !important;
         margin-top: 0.3rem;
         font-weight: 500;
     }
 
-    /* Dark Live Status Card */
+    /* 3. Live Radar Status Card */
     .live-status-card {
-        background: #064E3B;
-        border: 1.5px solid #059669;
+        background: #064E3B !important;
+        border: 1.5px solid #10B981 !important;
         border-radius: 12px;
         padding: 1rem 1.3rem;
         margin-bottom: 1.2rem;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        color: #ECFDF5;
+        color: #F0FDF4 !important;
+    }
+    .live-status-card strong, .live-status-card div, .live-status-card b {
+        color: #F0FDF4 !important;
     }
     .live-status-offline {
-        background: #1E293B;
-        border: 1.5px solid #334155;
+        background: #1E293B !important;
+        border: 1.5px solid #475569 !important;
         border-radius: 12px;
         padding: 1rem 1.3rem;
         margin-bottom: 1.2rem;
-        color: #94A3B8;
+        color: #CBD5E1 !important;
+    }
+    .live-status-offline strong, .live-status-offline div, .live-status-offline code {
+        color: #CBD5E1 !important;
     }
     .pulse-dot {
         display: inline-block;
@@ -142,48 +166,92 @@ if is_dark:
         100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
     }
 
-    /* Dark Cards */
+    /* 4. Diagnosis & Problem Cards */
     .diagnosis-card {
-        background: #131B2E;
-        border: 1px solid #1E293B;
+        background: #131B2E !important;
+        border: 1px solid #1E293B !important;
         border-radius: 12px;
         padding: 1.4rem;
         margin-bottom: 1rem;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 14px rgba(0,0,0,0.25);
     }
+    .diagnosis-card p, .diagnosis-card h4, .diagnosis-card div, .diagnosis-card strong {
+        color: #F8FAFC !important;
+    }
+    
+    /* Section Tags */
     .section-tag {
         display: inline-block;
         font-weight: 700;
         font-size: 0.75rem;
         text-transform: uppercase;
         letter-spacing: 0.05em;
-        padding: 0.25rem 0.6rem;
+        padding: 0.3rem 0.7rem;
         border-radius: 6px;
         margin-bottom: 0.5rem;
     }
-    .tag-cause { background: #450A0A; color: #FCA5A5; border: 1px solid #991B1B; }
-    .tag-fix { background: #064E3B; color: #6EE7B7; border: 1px solid #059669; }
-    .tag-verify { background: #172554; color: #93C5FD; border: 1px solid #1D4ED8; }
-    .tag-tip { background: #451A03; color: #FCD34D; border: 1px solid #B45309; }
+    .tag-cause { background: #581C87 !important; color: #E9D5FF !important; border: 1px solid #9333EA !important; }
+    .tag-fix { background: #064E3B !important; color: #A7F3D0 !important; border: 1px solid #10B981 !important; }
+    .tag-verify { background: #1E3A8A !important; color: #BFDBFE !important; border: 1px solid #3B82F6 !important; }
+    .tag-tip { background: #78350F !important; color: #FDE68A !important; border: 1px solid #D97706 !important; }
     
+    /* Step Items */
     .step-item {
-        background: #0F172A;
-        border-left: 4px solid #38BDF8;
-        padding: 0.7rem 1rem;
+        background: #0F172A !important;
+        border-left: 4px solid #38BDF8 !important;
+        padding: 0.75rem 1.1rem;
         border-radius: 0 8px 8px 0;
         margin-bottom: 0.6rem;
-        color: #F8FAFC;
+        color: #F8FAFC !important;
+    }
+    .step-item strong {
+        color: #38BDF8 !important;
     }
 
-    /* Dark Sidebar & Streamlit widgets */
+    /* 5. Streamlit Sidebar & Controls */
     [data-testid="stSidebar"] {
         background-color: #0F172A !important;
-        border-right: 1px solid #1E293B;
+        border-right: 1px solid #1E293B !important;
     }
-    .stTextInput > div > div > input, .stTextArea > div > div > textarea, .stSelectbox > div > div {
+    [data-testid="stSidebar"] * {
+        color: #F8FAFC !important;
+    }
+    
+    /* Inputs, Selectboxes, Textareas */
+    .stTextInput input, .stTextArea textarea, div[data-baseweb="select"] > div {
         background-color: #1E293B !important;
         color: #F8FAFC !important;
-        border-color: #334155 !important;
+        border: 1px solid #334155 !important;
+        border-radius: 8px !important;
+    }
+    div[data-baseweb="select"] * {
+        color: #F8FAFC !important;
+    }
+    
+    /* Radio options & buttons */
+    div[data-testid="stRadio"] label, div[data-testid="stRadio"] div {
+        color: #F8FAFC !important;
+    }
+
+    /* Metrics & Expanders */
+    div[data-testid="stMetricValue"] {
+        color: #38BDF8 !important;
+    }
+    div[data-testid="stMetricLabel"] p {
+        color: #94A3B8 !important;
+    }
+    div[data-testid="stExpander"] {
+        background-color: #131B2E !important;
+        border: 1px solid #1E293B !important;
+        border-radius: 10px !important;
+    }
+    div[data-testid="stExpander"] * {
+        color: #F8FAFC !important;
+    }
+
+    /* Code Blocks */
+    code, pre {
+        color: #38BDF8 !important;
     }
     </style>
     """
@@ -193,14 +261,20 @@ else:
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap');
     
     html, body, [class*="css"], .stApp {
-        font-family: 'Inter', sans-serif;
+        font-family: 'Inter', sans-serif !important;
         background-color: #FFFFFF !important;
         color: #0F172A !important;
     }
     
+    div[data-testid="stMarkdownContainer"] p,
+    label[data-testid="stWidgetLabel"] p,
+    .stMarkdown, p, span, label, h1, h2, h3, h4, h5, h6 {
+        color: #0F172A !important;
+    }
+
     .copilot-header {
-        background: linear-gradient(135deg, #1E40AF 0%, #3B82F6 50%, #6366F1 100%);
-        color: white;
+        background: linear-gradient(135deg, #1E40AF 0%, #3B82F6 50%, #6366F1 100%) !important;
+        color: white !important;
         padding: 1.5rem 1.8rem;
         border-radius: 14px;
         margin-bottom: 1.2rem;
@@ -211,31 +285,33 @@ else:
         font-weight: 800;
         margin: 0;
         letter-spacing: -0.02em;
-        color: #FFFFFF;
+        color: #FFFFFF !important;
     }
     .copilot-subtitle {
         font-size: 1.0rem;
-        color: #E0E7FF;
+        color: #E0E7FF !important;
         margin-top: 0.3rem;
         font-weight: 500;
     }
 
     .live-status-card {
-        background: #F0FDF4;
-        border: 2px solid #86EFAC;
+        background: #F0FDF4 !important;
+        border: 2px solid #86EFAC !important;
         border-radius: 12px;
         padding: 1rem 1.3rem;
         margin-bottom: 1.2rem;
         display: flex;
         align-items: center;
         justify-content: space-between;
+        color: #166534 !important;
     }
     .live-status-offline {
-        background: #F8FAFC;
-        border: 2px solid #E2E8F0;
+        background: #F8FAFC !important;
+        border: 2px solid #E2E8F0 !important;
         border-radius: 12px;
         padding: 1rem 1.3rem;
         margin-bottom: 1.2rem;
+        color: #475569 !important;
     }
     .pulse-dot {
         display: inline-block;
@@ -254,8 +330,8 @@ else:
     }
 
     .diagnosis-card {
-        background: #FFFFFF;
-        border: 1px solid #E2E8F0;
+        background: #FFFFFF !important;
+        border: 1px solid #E2E8F0 !important;
         border-radius: 12px;
         padding: 1.4rem;
         margin-bottom: 1rem;
@@ -271,17 +347,21 @@ else:
         border-radius: 6px;
         margin-bottom: 0.5rem;
     }
-    .tag-cause { background: #FEE2E2; color: #991B1B; }
-    .tag-fix { background: #DCFCE7; color: #166534; }
-    .tag-verify { background: #DBEAFE; color: #1E40AF; }
-    .tag-tip { background: #FEF3C7; color: #92400E; }
+    .tag-cause { background: #FEE2E2 !important; color: #991B1B !important; border: 1px solid #F87171 !important; }
+    .tag-fix { background: #DCFCE7 !important; color: #166534 !important; border: 1px solid #86EFAC !important; }
+    .tag-verify { background: #DBEAFE !important; color: #1E40AF !important; border: 1px solid #93C5FD !important; }
+    .tag-tip { background: #FEF3C7 !important; color: #92400E !important; border: 1px solid #FCD34D !important; }
     
     .step-item {
-        background: #F8FAFC;
-        border-left: 4px solid #3B82F6;
+        background: #F8FAFC !important;
+        border-left: 4px solid #3B82F6 !important;
         padding: 0.7rem 1rem;
         border-radius: 0 8px 8px 0;
         margin-bottom: 0.6rem;
+        color: #0F172A !important;
+    }
+    .step-item strong {
+        color: #1E40AF !important;
     }
     </style>
     """
@@ -401,14 +481,13 @@ else:
 if mode_selection == "⚡ Live Packet Tracer Copilot":
     if live_buffer["exists"] and live_buffer["is_fresh"]:
         time_str = live_buffer["mtime"].strftime("%H:%M:%S")
-        status_text_color = "#34D399" if is_dark else "#166534"
         st.markdown(
             f"""
             <div class="live-status-card">
                 <div>
                     <span class="pulse-dot"></span>
-                    <strong style="color: {status_text_color}; font-size: 1.05rem;">LIVE PACKET TRACER SYNC: ACTIVE</strong>
-                    <div style="font-size: 0.88rem; margin-top: 0.2rem; opacity: 0.9;">
+                    <strong style="font-size: 1.05rem;">LIVE PACKET TRACER SYNC: ACTIVE</strong>
+                    <div style="font-size: 0.88rem; margin-top: 0.2rem; opacity: 0.95;">
                         NetSage AI is monitoring your clipboard. Capturing Cisco CLI text exclusively.
                     </div>
                 </div>
@@ -424,7 +503,7 @@ if mode_selection == "⚡ Live Packet Tracer Copilot":
             """
             <div class="live-status-offline">
                 <strong style="font-size: 1.05rem;">📡 Packet Tracer Listener Ready</strong>
-                <div style="font-size: 0.88rem; margin-top: 0.2rem; opacity: 0.85;">
+                <div style="font-size: 0.88rem; margin-top: 0.2rem; opacity: 0.9;">
                     Run <code>python pt_listener.py</code> in a terminal, then copy any CLI output in Packet Tracer (e.g. <code>show ip int brief</code>). The AI will auto-detect it!
                 </div>
             </div>
@@ -440,17 +519,15 @@ with col_left:
     st.markdown("### 1️⃣ Network Symptoms & CLI Output")
     
     with st.container():
-        sub_text_color = "#94A3B8" if is_dark else "#475569"
-        main_sym_color = "#F8FAFC" if is_dark else "#1E293B"
         st.markdown(
             f"""
             <div class="diagnosis-card">
                 <span class="section-tag tag-tip">🚨 Observed Problem</span>
-                <p style="font-size: 0.98rem; font-weight: 500; color: {main_sym_color}; margin-top: 0.4rem;">
+                <p style="font-size: 1.0rem; font-weight: 600; margin-top: 0.4rem; line-height: 1.5;">
                     {active_case.get('symptom')}
                 </p>
                 <span class="section-tag tag-verify">🗺️ Lab Topology Note</span>
-                <p style="font-size: 0.88rem; color: {sub_text_color}; margin-top: 0.2rem;">
+                <p style="font-size: 0.9rem; margin-top: 0.2rem; opacity: 0.9;">
                     {active_case.get('topology_note')}
                 </p>
             </div>
@@ -494,13 +571,15 @@ with col_right:
         vcmds = diag.get("verification_commands", [])
         quote = diag.get("cli_evidence_quote", "")
 
-        cause_color = "#F87171" if is_dark else "#991B1B"
+        cause_color = "#FCA5A5" if is_dark else "#991B1B"
         st.markdown(
             f"""
             <div class="diagnosis-card" style="border-left: 5px solid #EF4444;">
                 <span class="section-tag tag-cause">Root Cause Explained</span>
-                <h4 style="color: {cause_color}; margin: 0.3rem 0;">{root_cause}</h4>
-                <div style="font-size: 0.85rem; color: #94A3B8; margin-top: 0.4rem;">
+                <h4 style="color: {cause_color} !important; font-size: 1.15rem; font-weight: 700; margin: 0.4rem 0;">
+                    {root_cause}
+                </h4>
+                <div style="font-size: 0.88rem; margin-top: 0.5rem; opacity: 0.9;">
                     <b>Layer:</b> {layer} &nbsp;|&nbsp; <b>AI Confidence:</b> {conf:.0f}%
                 </div>
             </div>
@@ -513,12 +592,12 @@ with col_right:
                 st.markdown(f"```text\n{quote}\n```")
 
         st.markdown("#### 🛠️ Step-by-Step Fix (Copy & Paste to Packet Tracer)")
-        step_color = "#38BDF8" if is_dark else "#1E40AF"
+        step_header_color = "#38BDF8" if is_dark else "#1E40AF"
         for idx, step in enumerate(fixes, 1):
             st.markdown(
                 f"""
                 <div class="step-item">
-                    <strong style="color: {step_color};">Step {idx}:</strong>
+                    <strong style="color: {step_header_color} !important; font-size: 0.95rem;">Step {idx}:</strong>
                 </div>
                 """,
                 unsafe_allow_html=True,
