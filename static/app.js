@@ -1,5 +1,5 @@
 // ==========================================================================
-// NetSage AI — Netrion-Inspired Minimalist Command Center Client
+// NetSage AI — Netrion-Inspired Tabbed Command Center Client
 // ==========================================================================
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -32,6 +32,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const liveCapsule = document.getElementById("live-capsule");
   const capsuleText = document.getElementById("capsule-text");
   const capsuleTime = document.getElementById("capsule-time");
+
+  // Tabs
+  const tabBtns = document.querySelectorAll(".tab-btn");
+  const tabPanes = document.querySelectorAll(".tab-pane");
+  const tabBtnDiagnosis = document.getElementById("tab-btn-diagnosis");
 
   const caseBadge = document.getElementById("case-badge");
   const diagStatusBadge = document.getElementById("diag-status-badge");
@@ -71,12 +76,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnCancelReport = document.getElementById("btn-cancel-report");
   const btnSaveReport = document.getElementById("btn-save-report");
 
-  // Bottom Telemetry Elements
+  // Telemetry Elements
   const statLatency = document.getElementById("stat-latency");
   const statThroughput = document.getElementById("stat-throughput");
   const statTokens = document.getElementById("stat-tokens");
   const statRam = document.getElementById("stat-ram");
   const rulesSummary = document.getElementById("rules-summary");
+  const rulesList = document.getElementById("rules-list");
 
   // ------------------------------------------------------------------------
   // 1. Instant Zero-Lag Theme Switcher
@@ -94,6 +100,33 @@ document.addEventListener("DOMContentLoaded", () => {
     const current = htmlDoc.getAttribute("data-theme");
     const next = current === "dark" ? "light" : "dark";
     setTheme(next);
+  });
+
+  // ------------------------------------------------------------------------
+  // 1.5. Tab Navigation
+  // ------------------------------------------------------------------------
+  function switchTab(targetId) {
+    tabBtns.forEach(btn => {
+      if (btn.getAttribute("data-target") === targetId) {
+        btn.classList.add("active");
+      } else {
+        btn.classList.remove("active");
+      }
+    });
+
+    tabPanes.forEach(pane => {
+      if (pane.id === targetId) {
+        pane.classList.add("active");
+      } else {
+        pane.classList.remove("active");
+      }
+    });
+  }
+
+  tabBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+      switchTab(btn.getAttribute("data-target"));
+    });
   });
 
   // ------------------------------------------------------------------------
@@ -271,6 +304,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await res.json();
       latestDiagnosis = data;
       renderDiagnosis(data);
+      
+      // Auto-switch to Diagnosis tab!
+      switchTab("tab-diagnosis");
+
     } catch (e) {
       alert("Diagnostic error: " + e.message);
       diagStatusBadge.textContent = "ERROR";
@@ -359,7 +396,28 @@ document.addEventListener("DOMContentLoaded", () => {
     statThroughput.textContent = `${(tel.tokens_per_second || 0).toFixed(1)} t/s`;
     statTokens.textContent = `${tel.output_tokens || 0}`;
     statRam.textContent = `${(tel.process_ram_mb || 0).toFixed(1)} MB`;
-    rulesSummary.textContent = `Rules Triggered: ${findings.length}`;
+    
+    rulesSummary.textContent = `${findings.length} Flagged`;
+    rulesList.innerHTML = "";
+    if (findings.length === 0) {
+      rulesList.innerHTML = `<span class="empty-rules-text">✅ No deterministic rules were triggered for this output.</span>`;
+    } else {
+      findings.forEach(f => {
+        const d = document.createElement("div");
+        d.className = "context-box";
+        d.style.marginBottom = "0.5rem";
+        d.innerHTML = `
+          <div class="context-line" style="margin-bottom: 4px;">
+            <span class="context-tag tag-sym">${f.layer}</span>
+            <span class="context-val">[${f.rule_id}] ${f.title}</span>
+          </div>
+          <div class="context-line">
+            <span class="context-sub">Evidence: <code>${escapeHtml(f.evidence_snippet)}</code></span>
+          </div>
+        `;
+        rulesList.appendChild(d);
+      });
+    }
   }
 
   // ------------------------------------------------------------------------

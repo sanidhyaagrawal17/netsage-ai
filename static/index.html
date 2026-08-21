@@ -61,161 +61,196 @@
     </div>
   </div>
 
-  <!-- Main Split Workbench -->
+  <!-- Main Workspace -->
   <main class="workbench-container">
     
-    <!-- LEFT PANEL: Telemetry & Terminal Viewport -->
-    <section class="workbench-panel panel-left">
-      
-      <!-- Panel Header & Incident Meta -->
-      <div class="panel-topbar">
-        <div class="panel-heading">
-          <span class="panel-number">1</span>
-          <h3>Network Telemetry & CLI Buffer</h3>
-        </div>
-        <span id="case-badge" class="pill-badge pill-live">LIVE PT SESSION</span>
-      </div>
+    <!-- Tab Navigation -->
+    <nav class="workspace-tabs">
+      <button class="tab-btn active" data-target="tab-terminal">
+        <span class="tab-icon">💻</span> Terminal & Input
+      </button>
+      <button class="tab-btn" data-target="tab-diagnosis" id="tab-btn-diagnosis">
+        <span class="tab-icon">🧠</span> AI Diagnosis & Fix
+      </button>
+      <button class="tab-btn" data-target="tab-telemetry">
+        <span class="tab-icon">🔬</span> Advanced Telemetry
+      </button>
+    </nav>
 
-      <!-- Problem Context Capsule -->
-      <div class="context-box">
-        <div class="context-line">
-          <span class="context-tag tag-sym">Symptom</span>
-          <span id="symptom-text" class="context-val">Capturing live network anomaly from your active Cisco Packet Tracer terminal...</span>
-        </div>
-        <div class="context-line">
-          <span class="context-tag tag-top">Topology</span>
-          <span id="topology-text" class="context-sub">Cisco Packet Tracer live lab session.</span>
-        </div>
-      </div>
+    <!-- Tab Content Area -->
+    <div class="tab-content-area">
 
-      <!-- Sleek Terminal Editor -->
-      <div class="terminal-shell">
-        <div class="shell-bar">
-          <div class="shell-dots">
-            <span></span><span></span><span></span>
-          </div>
-          <span class="shell-title">cisco-ios-cli — show output</span>
-          <div class="shell-actions">
-            <button id="btn-clear-cli" class="shell-btn" title="Clear Terminal">Clear</button>
-            <button id="btn-copy-cli" class="shell-btn" title="Copy CLI text">Copy</button>
-          </div>
-        </div>
-        <textarea id="cli-textarea" class="shell-editor" spellcheck="false" placeholder="# Waiting for Packet Tracer CLI capture...&#10;# 1. Start 'python pt_listener.py' in a terminal.&#10;# 2. Copy any show-command output in Packet Tracer (e.g. 'show ip int brief')."></textarea>
-      </div>
-
-      <!-- Primary Action Bar -->
-      <div class="action-footer">
-        <button id="btn-diagnose" class="btn-diagnose">
-          <span class="btn-icon-symbol">⚡</span>
-          <span class="btn-text">Run Diagnostic Engine</span>
-          <span class="btn-shortcut">Ctrl + Enter</span>
-        </button>
-      </div>
-
-    </section>
-
-    <!-- RIGHT PANEL: AI Copilot Intelligence & Fix -->
-    <section class="workbench-panel panel-right">
-      
-      <!-- Panel Header -->
-      <div class="panel-topbar">
-        <div class="panel-heading">
-          <span class="panel-number">2</span>
-          <h3>NetSage AI Diagnosis & Fix</h3>
-        </div>
-        <div id="diag-status-badge" class="pill-badge pill-neutral">STANDBY</div>
-      </div>
-
-      <!-- Empty Standby View -->
-      <div id="ai-empty-state" class="empty-workbench">
-        <div class="empty-art">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <path d="M12 16v-4"></path>
-            <path d="M12 8h.01"></path>
-          </svg>
-        </div>
-        <h4>No Diagnostic Run Yet</h4>
-        <p>Paste CLI output or choose a practice case, then press <b>Run Diagnostic Engine</b>.</p>
-      </div>
-
-      <!-- Active Diagnostic Viewport -->
-      <div id="ai-diagnosis-content" class="diag-viewport hidden">
+      <!-- TAB 1: TERMINAL & INPUT -->
+      <section id="tab-terminal" class="tab-pane active">
         
-        <!-- Root Cause Banner -->
-        <div class="verdict-banner">
-          <div class="verdict-header">
-            <span class="verdict-tag">ROOT CAUSE ISOLATED</span>
-            <div class="verdict-metrics">
-              <span id="layer-badge" class="metric-pill">Layer 2</span>
-              <span id="ai-confidence" class="metric-pill metric-conf">95% Conf</span>
+        <!-- Panel Header & Incident Meta -->
+        <div class="panel-topbar">
+          <div class="panel-heading">
+            <h3>Network Telemetry & CLI Buffer</h3>
+          </div>
+          <span id="case-badge" class="pill-badge pill-live">LIVE PT SESSION</span>
+        </div>
+
+        <!-- Problem Context Capsule -->
+        <div class="context-box">
+          <div class="context-line">
+            <span class="context-tag tag-sym">Symptom</span>
+            <span id="symptom-text" class="context-val">Capturing live network anomaly from your active Cisco Packet Tracer terminal...</span>
+          </div>
+          <div class="context-line">
+            <span class="context-tag tag-top">Topology</span>
+            <span id="topology-text" class="context-sub">Cisco Packet Tracer live lab session.</span>
+          </div>
+        </div>
+
+        <!-- Sleek Terminal Editor -->
+        <div class="terminal-shell">
+          <div class="shell-bar">
+            <div class="shell-dots">
+              <span></span><span></span><span></span>
+            </div>
+            <span class="shell-title">cisco-ios-cli — show output</span>
+            <div class="shell-actions">
+              <button id="btn-clear-cli" class="shell-btn" title="Clear Terminal">Clear</button>
+              <button id="btn-copy-cli" class="shell-btn" title="Copy CLI text">Copy</button>
             </div>
           </div>
-          <h2 id="ai-root-cause" class="verdict-title">VLAN mismatch discovered on trunk link.</h2>
+          <textarea id="cli-textarea" class="shell-editor" spellcheck="false" placeholder="# Waiting for Packet Tracer CLI capture...&#10;# 1. Start 'python pt_listener.py' in a terminal.&#10;# 2. Copy any show-command output in Packet Tracer (e.g. 'show ip int brief')."></textarea>
         </div>
 
-        <!-- Evidence Snippet -->
-        <div class="evidence-wrapper">
-          <div class="evidence-header">
-            <span>Quoted Evidence from CLI</span>
-          </div>
-          <pre id="ai-evidence-text" class="evidence-body"></pre>
+        <!-- Primary Action Bar -->
+        <div class="action-footer">
+          <button id="btn-diagnose" class="btn-diagnose">
+            <span class="btn-icon-symbol">⚡</span>
+            <span class="btn-text">Run Diagnostic Engine</span>
+            <span class="btn-shortcut">Ctrl + Enter</span>
+          </button>
         </div>
 
-        <!-- Remediation Plan -->
-        <div class="remediation-box">
-          <div class="remediation-header">
-            <h4>🛠️ Actionable Remediation Steps</h4>
-            <button id="btn-copy-all-fixes" class="btn-link">Copy All</button>
+      </section>
+
+      <!-- TAB 2: AI DIAGNOSIS & FIX -->
+      <section id="tab-diagnosis" class="tab-pane">
+        
+        <div class="panel-topbar">
+          <div class="panel-heading">
+            <h3>NetSage AI Remediation Plan</h3>
           </div>
-          <div id="fix-steps-list" class="steps-container"></div>
+          <div id="diag-status-badge" class="pill-badge pill-neutral">STANDBY</div>
         </div>
 
-        <!-- Verification Commands -->
-        <div class="verification-box">
-          <div class="verification-header">
-            <span>🧪 Verification Commands</span>
+        <!-- Empty Standby View -->
+        <div id="ai-empty-state" class="empty-workbench">
+          <div class="empty-art">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M12 16v-4"></path>
+              <path d="M12 8h.01"></path>
+            </svg>
           </div>
-          <div id="verify-commands-list" class="verify-container"></div>
+          <h4>No Diagnostic Run Yet</h4>
+          <p>Return to the <b>Terminal & Input</b> tab to run the diagnostic engine.</p>
         </div>
 
-        <!-- Human-in-the-Loop Review Gate -->
-        <div class="approval-card">
-          <div class="approval-info">
-            <h4>Human-in-the-Loop Safety Gate</h4>
-            <p>Approve or adjust this remediation before executing on devices:</p>
+        <!-- Active Diagnostic Viewport -->
+        <div id="ai-diagnosis-content" class="diag-viewport hidden">
+          
+          <!-- Root Cause Banner -->
+          <div class="verdict-banner">
+            <div class="verdict-header">
+              <span class="verdict-tag">ROOT CAUSE ISOLATED</span>
+              <div class="verdict-metrics">
+                <span id="layer-badge" class="metric-pill">Layer 2</span>
+                <span id="ai-confidence" class="metric-pill metric-conf">95% Conf</span>
+              </div>
+            </div>
+            <h2 id="ai-root-cause" class="verdict-title">VLAN mismatch discovered on trunk link.</h2>
           </div>
-          <div class="approval-btns">
-            <button id="btn-accept-fix" class="btn-gate btn-gate-accept">✓ Approve Fix</button>
-            <button id="btn-edit-fix" class="btn-gate btn-gate-edit">✎ Edit Fix</button>
-            <button id="btn-report-fix" class="btn-gate btn-gate-reject">✕ Report Error</button>
+
+          <!-- Evidence Snippet -->
+          <div class="evidence-wrapper">
+            <div class="evidence-header">
+              <span>Quoted Evidence from CLI</span>
+            </div>
+            <pre id="ai-evidence-text" class="evidence-body"></pre>
+          </div>
+
+          <!-- Remediation Plan -->
+          <div class="remediation-box">
+            <div class="remediation-header">
+              <h4>🛠️ Actionable Remediation Steps</h4>
+              <button id="btn-copy-all-fixes" class="btn-link">Copy All</button>
+            </div>
+            <div id="fix-steps-list" class="steps-container"></div>
+          </div>
+
+          <!-- Verification Commands -->
+          <div class="verification-box">
+            <div class="verification-header">
+              <span>🧪 Verification Commands</span>
+            </div>
+            <div id="verify-commands-list" class="verify-container"></div>
+          </div>
+
+          <!-- Human-in-the-Loop Review Gate -->
+          <div class="approval-card">
+            <div class="approval-info">
+              <h4>Human-in-the-Loop Safety Gate</h4>
+              <p>Approve or adjust this remediation before executing on devices:</p>
+            </div>
+            <div class="approval-btns">
+              <button id="btn-accept-fix" class="btn-gate btn-gate-accept">✓ Approve Fix</button>
+              <button id="btn-edit-fix" class="btn-gate btn-gate-edit">✎ Edit Fix</button>
+              <button id="btn-report-fix" class="btn-gate btn-gate-reject">✕ Report Error</button>
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- TAB 3: ADVANCED TELEMETRY -->
+      <section id="tab-telemetry" class="tab-pane">
+        
+        <div class="panel-topbar">
+          <div class="panel-heading">
+            <h3>Diagnostic Telemetry & Rule Execution (RQ2 & RQ3)</h3>
           </div>
         </div>
 
-      </div>
+        <div class="telemetry-grid">
+          <div class="telemetry-card">
+            <span class="tc-label">Inference Latency (Δt)</span>
+            <strong id="stat-latency" class="tc-val">-- ms</strong>
+          </div>
+          <div class="telemetry-card">
+            <span class="tc-label">Throughput Speed</span>
+            <strong id="stat-throughput" class="tc-val">-- t/s</strong>
+          </div>
+          <div class="telemetry-card">
+            <span class="tc-label">Output Tokens</span>
+            <strong id="stat-tokens" class="tc-val">--</strong>
+          </div>
+          <div class="telemetry-card">
+            <span class="tc-label">Process RAM (RSS)</span>
+            <strong id="stat-ram" class="tc-val">-- MB</strong>
+          </div>
+        </div>
 
-    </section>
+        <div class="rules-container">
+          <div class="rules-header">
+            <h4>Deterministic Rules Triggered</h4>
+            <span id="rules-summary" class="rules-badge">0 Flagged</span>
+          </div>
+          <div id="rules-list" class="rules-chips">
+            <span class="empty-rules-text">No rules evaluated yet.</span>
+          </div>
+        </div>
 
+      </section>
+
+    </div>
   </main>
-
-  <!-- Bottom Telemetry Ribbon -->
-  <footer class="telemetry-bar">
-    <div class="telemetry-summary">
-      <span class="telem-item">Latency: <b id="stat-latency">-- ms</b></span>
-      <span class="telem-divider">•</span>
-      <span class="telem-item">Throughput: <b id="stat-throughput">-- t/s</b></span>
-      <span class="telem-divider">•</span>
-      <span class="telem-item">Tokens: <b id="stat-tokens">--</b></span>
-      <span class="telem-divider">•</span>
-      <span class="telem-item">RAM (RSS): <b id="stat-ram">-- MB</b></span>
-      <span class="telem-divider">•</span>
-      <span class="telem-item">Model: <b>qwen2.5-coder:3b</b></span>
-    </div>
-
-    <div class="telemetry-rules">
-      <span id="rules-summary" class="rules-badge">Rules Triggered: 0</span>
-    </div>
-  </footer>
 
   <!-- Modal: Adjust Fix -->
   <div id="modal-adjust" class="modal-overlay hidden">
