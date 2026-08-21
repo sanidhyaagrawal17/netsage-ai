@@ -2,7 +2,8 @@
 
 Features:
 - Seamless High-Contrast 🌙 Dark Mode / ☀️ Light Mode
-- Pixel-Perfect Code & Terminal Styling (Deep Midnight Slate `#020617` with `#38BDF8` & `#F8FAFC` text)
+- Pixel-Perfect Code & Terminal Styling (Deep Midnight Slate `#030712` with `#38BDF8` & `#F8FAFC` text)
+- Clean Standalone Desktop Aesthetic (Hidden Deploy/Menu clutter)
 - Live Packet Tracer Sync Indicator (pulsing real-time radar badge)
 - Student-friendly plain English diagnostic explanations
 - Copyable Cisco IOS fix commands & verification steps
@@ -77,6 +78,15 @@ if is_dark:
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap');
     
+    /* Clean up native Streamlit clutter */
+    .stDeployButton, #MainMenu, footer {
+        display: none !important;
+        visibility: hidden !important;
+    }
+    header[data-testid="stHeader"] {
+        background-color: transparent !important;
+    }
+
     /* 1. Global Reset & Universal Dark Text Colors */
     html, body, [class*="css"], .stApp, .main, [data-testid="stAppViewContainer"] {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
@@ -163,7 +173,7 @@ if is_dark:
     @keyframes pulse-dark {
         0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7); }
         70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(52, 211, 153, 0); }
-        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7); }
     }
 
     /* 4. Diagnosis & Problem Cards */
@@ -208,7 +218,7 @@ if is_dark:
         color: #38BDF8 !important;
     }
 
-    /* 5. CRITICAL FIX: Code & Terminal Boxes in Dark Mode */
+    /* 5. Code & Terminal Boxes in Dark Mode */
     pre, code, 
     div[data-testid="stCode"] pre, 
     div[data-testid="stCode"] code,
@@ -226,7 +236,6 @@ if is_dark:
         color: #F8FAFC !important;
     }
     
-    /* Inline code snippet */
     p code, li code {
         background-color: #1F2937 !important;
         color: #38BDF8 !important;
@@ -313,6 +322,14 @@ else:
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fira+Code:wght@400;500;600&display=swap');
     
+    .stDeployButton, #MainMenu, footer {
+        display: none !important;
+        visibility: hidden !important;
+    }
+    header[data-testid="stHeader"] {
+        background-color: transparent !important;
+    }
+
     html, body, [class*="css"], .stApp {
         font-family: 'Inter', sans-serif !important;
         background-color: #FFFFFF !important;
