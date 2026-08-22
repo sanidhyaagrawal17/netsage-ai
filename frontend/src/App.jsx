@@ -5,6 +5,8 @@ import FloatingStatus from './components/FloatingStatus';
 import TerminalInput from './components/TerminalInput';
 import DiagnosisView from './components/DiagnosisView';
 import TelemetryView from './components/TelemetryView';
+import HistoryView from './components/HistoryView';
+import AuditView from './components/AuditView';
 import ChatPanel from './components/ChatPanel';
 import './index.css';
 
@@ -17,7 +19,8 @@ export default function App() {
           <TerminalInput />
           <DiagnosisView />
           <TelemetryView />
-          {/* History and Audit views will go here in later phases */}
+          <HistoryView />
+          <AuditView />
         </main>
         <ChatPanel />
         <FloatingStatus />
