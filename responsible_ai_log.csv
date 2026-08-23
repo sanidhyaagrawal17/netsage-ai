@@ -29,3 +29,4 @@ timestamp,case_id,osi_layer,severity,concept_tag,model_used,is_simulated,inferen
 2026-08-20 09:50:19,CASE-028,Application,High,ntp_unsynchronized,qwen2.5-coder:3b,True,45.2,234,64,1280.0,98.26,44.2,Edited,Unsafe / Invalid Remediation Step (CLI command syntax invalid in Cisco IOS),True,Phase 2 automated test validation.
 2026-08-20 09:50:19,CASE-029,Application,High,vty_acl_ssh_blocked,qwen2.5-coder:3b,True,45.2,183,52,1040.0,98.26,44.2,Accepted,None / Valid AI Diagnosis,True,Phase 2 automated test validation.
 2026-08-20 09:50:19,CASE-030,Application,High,nat_pool_exhausted,qwen2.5-coder:3b,True,45.2,223,57,1140.0,98.26,44.2,Accepted,None / Valid AI Diagnosis,True,Phase 2 automated test validation.
+2026-08-21 09:31:33,LIVE-PT-SESSION,Data Link,High,vlan_mismatch,qwen2.5-coder:3b,True,32044.63,311,73,2.28,127.74,63.3,Accepted,None / Valid AI Diagnosis,True,Student approved fix.

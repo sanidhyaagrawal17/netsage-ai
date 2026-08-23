@@ -666,6 +666,52 @@ def run_all_checks(show_output: str, metadata: Optional[Dict[str, Any]] = None) 
     return findings
 
 
+def extract_relevant_context(show_output: str, findings: List[Dict[str, Any]], context_lines: int = 3, max_lines: int = 100) -> str:
+    """Extracts only the relevant portions of the CLI output based on deterministic findings."""
+    if not findings:
+        return show_output  # If no findings, return the whole output (or we could truncate it)
+        
+    lines = show_output.splitlines()
+    relevant_indices = set()
+    
+    for finding in findings:
+        snippet = finding.get("evidence_snippet", "")
+        if not snippet:
+            continue
+            
+        snippet_lower = snippet.lower()
+        for i, line in enumerate(lines):
+            # Try to match snippet parts to the line
+            if snippet_lower in line.lower() or any(part in line.lower() for part in snippet_lower.split('\n') if len(part) > 5):
+                # Add context around the match
+                start = max(0, i - context_lines)
+                end = min(len(lines), i + context_lines + 1)
+                for j in range(start, end):
+                    relevant_indices.add(j)
+
+    if not relevant_indices:
+        # Fallback if no exact match found: return first 50 and last 50 lines
+        if len(lines) <= max_lines:
+            return show_output
+        return "\n".join(lines[:50]) + "\n... [TRUNCATED] ...\n" + "\n".join(lines[-50:])
+        
+    sorted_indices = sorted(list(relevant_indices))
+    
+    # Cap total lines
+    if len(sorted_indices) > max_lines:
+        sorted_indices = sorted_indices[:max_lines]
+        
+    extracted = []
+    last_idx = -2
+    for idx in sorted_indices:
+        if idx > last_idx + 1 and last_idx != -2:
+            extracted.append("... [TRUNCATED] ...")
+        extracted.append(lines[idx])
+        last_idx = idx
+        
+    return "\n".join(extracted)
+
+
 if __name__ == "__main__":
     sample_cli = """
     PC-1> ipconfig /all

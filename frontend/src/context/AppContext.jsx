@@ -8,9 +8,12 @@ const initialState = {
   liveStatus: { active: false, text: 'Standby' },
   aiStatus: 'idle', // 'idle' | 'rules' | 'thinking' | 'streaming' | 'offline'
   diagnosis: null,
+  streamedRaw: '',
   diagnosisHistory: [], // Placeholder for phase 3
   cliInput: '# Waiting for Packet Tracer CLI capture...\n# 1. Start python pt_listener.py\n# 2. Copy any show-command output in Packet Tracer.',
   currentModel: 'llama3.1:8b',
+  isCopilotOpen: true,
+  isSidebarCollapsed: false,
 };
 
 function reducer(state, action) {
@@ -25,10 +28,20 @@ function reducer(state, action) {
       return { ...state, aiStatus: action.payload };
     case 'SET_DIAGNOSIS':
       return { ...state, diagnosis: action.payload };
+    case 'SET_STREAMED_RAW':
+      return { ...state, streamedRaw: action.payload };
     case 'SET_CLI_INPUT':
       return { ...state, cliInput: action.payload };
     case 'SET_CURRENT_MODEL':
       return { ...state, currentModel: action.payload };
+    case 'TOGGLE_COPILOT':
+      return { ...state, isCopilotOpen: !state.isCopilotOpen };
+    case 'SET_COPILOT_OPEN':
+      return { ...state, isCopilotOpen: action.payload };
+    case 'TOGGLE_SIDEBAR':
+      return { ...state, isSidebarCollapsed: !state.isSidebarCollapsed };
+    case 'SET_SIDEBAR_COLLAPSED':
+      return { ...state, isSidebarCollapsed: action.payload };
     default:
       return state;
   }

@@ -22,13 +22,13 @@ import pandas as pd
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 # Local diagnostic engines
-from checker import run_all_checks
-from llm_engine import log_telemetry_and_audit, query_local_slm
+from checker import run_all_checks, extract_relevant_context
+from llm_engine import log_telemetry_and_audit, query_local_slm, query_local_slm_stream
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -139,13 +139,16 @@ def run_diagnosis(req: DiagnoseRequest):
     # 1. Deterministic rules
     findings = run_all_checks(show_outputs)
     
-    # 2. Local SLM reasoning
+    # 2. Extract relevant context (Phase 2 optimization)
+    filtered_context = extract_relevant_context(show_outputs, findings)
+    
+    # 3. Local SLM reasoning
     prompt_template = load_prompt_template()
     case_data = {
         "case_id": req.case_id,
         "symptom": req.symptom,
         "topology_note": req.topology_note or "",
-        "show_outputs": show_outputs,
+        "show_outputs": filtered_context,
         "osi_layer": req.osi_layer or "Network",
         "severity": req.severity or "Medium",
         "concept_tag": req.concept_tag or "general",
@@ -165,6 +168,51 @@ def run_diagnosis(req: DiagnoseRequest):
         "deterministic_findings": findings,
         "diagnosis": diagnosis,
     }
+
+
+@app.post("/api/diagnose/stream")
+def run_diagnosis_stream(req: DiagnoseRequest):
+    """Stream diagnosis tokens via SSE."""
+    show_outputs = req.show_outputs or ""
+    
+    # 1. Deterministic rules
+    findings = run_all_checks(show_outputs)
+    
+    # 2. Extract relevant context
+    filtered_context = extract_relevant_context(show_outputs, findings)
+    
+    # 3. Build Case Data
+    prompt_template = load_prompt_template()
+    case_data = {
+        "case_id": req.case_id,
+        "symptom": req.symptom,
+        "topology_note": req.topology_note or "",
+        "show_outputs": filtered_context,
+        "osi_layer": req.osi_layer or "Network",
+        "severity": req.severity or "Medium",
+        "concept_tag": req.concept_tag or "general",
+    }
+
+    def generate_events():
+        # First send the findings so the UI can update immediately
+        yield f"data: {json.dumps({'type': 'findings', 'data': findings})}\n\n"
+        
+        # Then stream the LLM response
+        token_stream = query_local_slm_stream(
+            prompt_template=prompt_template,
+            case_data=case_data,
+            model_name=req.model_name or "qwen2.5-coder:3b",
+            ollama_host=req.ollama_host or "http://localhost:11434",
+            deterministic_findings=findings,
+        )
+        
+        for token in token_stream:
+            # We wrap the token in our own JSON structure
+            yield f"data: {json.dumps({'type': 'token', 'token': token})}\n\n"
+            
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+    return StreamingResponse(generate_events(), media_type="text/event-stream")
 
 
 @app.post("/api/review")
@@ -200,6 +248,41 @@ def get_benchmarks():
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+
+
+# --- Listener Management ---
+import subprocess as _sp
+_listener_proc = None
+
+@app.post("/api/listener/start")
+def start_listener():
+    global _listener_proc
+    if _listener_proc and _listener_proc.poll() is None:
+        return {"status": "already_running", "pid": _listener_proc.pid}
+    try:
+        _listener_proc = _sp.Popen(
+            ["python", "pt_listener.py"],
+            cwd=str(Path(__file__).parent),
+            creationflags=_sp.CREATE_NO_WINDOW if hasattr(_sp, "CREATE_NO_WINDOW") else 0,
+        )
+        return {"status": "started", "pid": _listener_proc.pid}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
+
+@app.post("/api/listener/stop")
+def stop_listener():
+    global _listener_proc
+    if _listener_proc and _listener_proc.poll() is None:
+        _listener_proc.terminate()
+        _listener_proc = None
+        return {"status": "stopped"}
+    return {"status": "not_running"}
+
+@app.get("/api/listener/status")
+def listener_status():
+    global _listener_proc
+    running = _listener_proc is not None and _listener_proc.poll() is None
+    return {"running": running, "pid": _listener_proc.pid if running else None}
 
 @app.get("/")
 def serve_index():

@@ -162,6 +162,51 @@ def simulate_fallback_diagnosis(
     }
 
 
+def query_local_slm_stream(
+    prompt_template: str,
+    case_data: Dict[str, Any],
+    model_name: str = "qwen2.5-coder:3b",
+    ollama_host: str = "http://localhost:11434",
+    deterministic_findings: Optional[List[Dict[str, Any]]] = None,
+):
+    """Generator that yields tokens from Ollama in streaming mode."""
+    full_prompt = build_prompt(prompt_template, case_data, deterministic_findings)
+    endpoint = f"{ollama_host.rstrip('/')}/api/generate"
+
+    payload = {
+        "model": model_name,
+        "prompt": full_prompt,
+        "stream": True,
+        "format": "json",
+        "options": {
+            "temperature": 0.1,
+            "top_p": 0.9,
+            "num_ctx": 8192,
+        },
+    }
+
+    try:
+        response = requests.post(endpoint, json=payload, stream=True, timeout=10.0)
+        response.raise_for_status()
+        
+        for line in response.iter_lines():
+            if line:
+                data = json.loads(line)
+                token = data.get("response", "")
+                if token:
+                    yield token
+                    
+    except Exception as exc:
+        logger.error(f"Error querying SLM (Stream): {exc}")
+        # Yield a fallback simulated response in chunks if offline
+        simulated = simulate_fallback_diagnosis(case_data, deterministic_findings, 500)
+        simulated_str = json.dumps(simulated)
+        # Yield it in chunks of 50 chars to simulate streaming
+        for i in range(0, len(simulated_str), 50):
+            yield simulated_str[i:i+50]
+            time.sleep(0.05)
+
+
 def query_local_slm(
     prompt_template: str,
     case_data: Dict[str, Any],
