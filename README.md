@@ -99,7 +99,6 @@ netsage-ai/
 ├── diagnose_prompt.md          # Few-shot system prompt enforcing strict JSON output
 ├── llm_engine.py               # Local SLM wrapper with native Ollama telemetry & RAM profiling
 ├── pt_listener.py              # Track A: Live Cisco Packet Tracer clipboard listener daemon
-├── live_cli_input.txt          # Track A: Real-time captured CLI buffer
 ├── run_benchmarks.py           # Track B: Automated 30-case benchmark runner for IEEE paper
 ├── benchmark_paper_results.csv # Track B: Empirical benchmark dataset (Latency, t/s, RAM)
 ├── server.py                   # FastAPI backend with SSE streaming & listener management
@@ -129,7 +128,7 @@ netsage-ai/
 ### 1. Backend Setup
 ```bash
 # Clone the repository
-git clone https://github.com/<your-username>/netsage-ai.git
+git clone https://github.com/sanidhyaagrawal17/netsage-ai.git
 cd netsage-ai
 
 # Install Python dependencies
@@ -188,6 +187,34 @@ Evaluates all 30 test cases across Variant A (Deterministic) and Variant C (Hybr
 | **Layer 3 (Network)** | 10 Cases | Interface administratively shutdown, gateway subnet mismatch, subnet mask prefix mismatch, missing static route, OSPF MTU mismatch (EXSTART), OSPF Area ID mismatch, OSPF Hello/Dead timer mismatch, OSPF passive interface, HSRP duplicate active conflict, unreachable next-hop routing. |
 | **Layer 4 (Transport & Security)** | 6 Cases | ACL implicit deny drops, explicit TCP port filtering (HTTP/HTTPS 443), inverted wildcard masks (`255.255.255.0` vs `0.0.0.255`), ACL direction misapplication, NAT PAT source ACL exclusion, VPN tunnel MTU/MSS black holes. |
 | **Layer 7 (Services & Application)** | 6 Cases | DHCP pool exhaustion, missing IP helper-address (DHCP relay), DNS server misconfiguration, NTP clock unsynchronized (stratum 16), VTY line SSH ACL restrictions, dynamic NAT public pool exhaustion. |
+
+---
+
+## 📊 Empirical Telemetry Specifications (RQ2 & RQ3)
+
+### 1. Inference Latency (Δt)
+Measures the end-to-end turnaround time for diagnostic inference:
+
+$$	ext{Latency (ms)} = rac{	ext{Total Duration (ns)}}{1{,}000{,}000}$$
+
+### 2. Token Throughput (Tokens per Second)
+Measures generative decoding speed across local SLM architectures:
+
+$$	ext{Throughput (t/s)} = rac{	ext{Output Tokens}}{rac{	ext{Evaluation Duration (ns)}}{1{,}000{,}000{,}000}}$$
+
+### 3. System Memory Footprint
+Captured continuously via `psutil`:
+- **Process RSS Memory**: Dedicated Python RAM consumption in Megabytes (MB).
+- **System Memory Load**: Total host virtual memory utilization percentage (%).
+
+### 4. Publication Failure Mode Taxonomy (RQ3)
+When human reviewers edit or reject an AI diagnosis, they categorize the failure mode into one of 6 discrete classes:
+1. `None / Valid AI Diagnosis` (Accepted)
+2. `Hallucinated CLI Evidence (Model quoted line not in show output)`
+3. `Missed Subnet Mask Boundary (Model miscalculated host/subnet alignment)`
+4. `Wrong OSI Layer Identification (e.g., tagged L2 issue as L3)`
+5. `Unsafe / Invalid Remediation Step (CLI command syntax invalid in Cisco IOS)`
+6. `Incorrect Root Cause Diagnosis (Misattributed fault)`
 
 ---
 
