@@ -1,14 +1,26 @@
-import ChatMessageContent from './ChatMessageContent';
-import React, { useState, useEffect, useRef } from 'react';
-import { MessageSquare, X, Send, Sparkles, Terminal, ChevronRight, Bot, Trash2, Layers, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { MessageSquare, X, Send, Sparkles, Terminal, ChevronRight, Bot, Trash2, Layers, Loader2, Maximize2, Minimize2 } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAppContext } from '../context/AppContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
+import ChatMessageContent from './ChatMessageContent';
+import { cn } from '../lib/utils';
 
 export default function ChatPanel() {
   const [inputMessage, setInputMessage] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [width, setWidth] = useState(() => {
+    try {
+      const saved = localStorage.getItem('netsage_copilot_width');
+      return saved ? Math.max(300, Math.min(1000, parseInt(saved, 10))) : 360;
+    } catch (e) {
+      return 360;
+    }
+  });
+
   const { state, dispatch } = useAppContext();
   const messagesEndRef = useRef(null);
 
@@ -30,6 +42,36 @@ export default function ChatPanel() {
       sendMessage(prompt);
     }
   }, [state.pendingCopilotPrompt]);
+
+  // Drag-to-resize handler
+  const startResize = useCallback((e) => {
+    e.preventDefault();
+    setIsResizing(true);
+    const startX = e.clientX;
+    const startWidth = width;
+
+    const onMouseMove = (moveEvent) => {
+      const delta = startX - moveEvent.clientX; // Moving mouse left increases width
+      const maxWidth = window.innerWidth - (state.isSidebarCollapsed ? 80 : 260);
+      const newWidth = Math.max(280, Math.min(maxWidth, startWidth + delta));
+      setWidth(newWidth);
+    };
+
+    const onMouseUp = (upEvent) => {
+      setIsResizing(false);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      const finalDelta = startX - upEvent.clientX;
+      const maxWidth = window.innerWidth - (state.isSidebarCollapsed ? 80 : 260);
+      const finalWidth = Math.max(280, Math.min(maxWidth, startWidth + finalDelta));
+      try {
+        localStorage.setItem('netsage_copilot_width', String(finalWidth));
+      } catch (err) {}
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }, [width, state.isSidebarCollapsed]);
 
   const quickPrompts = [
     "Explain native VLAN mismatch simply",
@@ -141,15 +183,41 @@ export default function ChatPanel() {
 
   if (!state.isCopilotOpen) return null;
 
+  // Calculate actual width style
+  const sidebarWidth = state.isSidebarCollapsed ? 64 : 240;
+  const currentWidthStyle = isMaximized 
+    ? `calc(100vw - ${sidebarWidth}px)` 
+    : `${width}px`;
+
   return (
     <AnimatePresence>
       <motion.aside 
         initial={{ width: 0, opacity: 0 }}
-        animate={{ width: 340, opacity: 1 }}
+        animate={{ width: currentWidthStyle, opacity: 1 }}
         exit={{ width: 0, opacity: 0 }}
-        transition={{ type: "spring", stiffness: 350, damping: 30 }}
-        className="w-[340px] border-l border-border bg-card flex flex-col h-screen select-none flex-shrink-0 transition-colors duration-200"
+        transition={isResizing ? { duration: 0 } : { type: "spring", stiffness: 350, damping: 30 }}
+        style={{ width: currentWidthStyle }}
+        className={cn(
+          "relative border-l border-border bg-card flex flex-col h-screen select-none flex-shrink-0 transition-colors duration-200 shadow-2xl",
+          isMaximized && "z-20",
+          isResizing && "select-none cursor-col-resize"
+        )}
       >
+        {/* Resize Handle (Left Edge) */}
+        {!isMaximized && (
+          <div
+            onMouseDown={startResize}
+            className={cn(
+              "absolute left-0 top-0 bottom-0 w-2 -ml-1 cursor-col-resize z-30 transition-colors group",
+              "hover:bg-blue-500/40 active:bg-blue-500",
+              isResizing && "bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.8)]"
+            )}
+            title="Drag to resize Copilot drawer"
+          >
+            <div className="absolute left-1/2 top-1/2 -translate-y-1/2 -translate-x-1/2 w-0.5 h-8 rounded-full bg-zinc-600 group-hover:bg-blue-400 transition-colors" />
+          </div>
+        )}
+
         {/* Header */}
         <header className="h-16 flex items-center justify-between px-4 border-b border-border flex-shrink-0">
           <div className="flex items-center gap-2.5">
@@ -157,11 +225,27 @@ export default function ChatPanel() {
               <Bot size={15} className="text-blue-400" />
             </div>
             <div>
-              <span className="font-semibold text-xs text-foreground tracking-tight block">NetSage Copilot</span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-semibold text-xs text-foreground tracking-tight block">NetSage Copilot</span>
+                {isMaximized && (
+                  <span className="text-[10px] font-medium text-blue-400 bg-blue-500/10 px-1.5 py-0.2 rounded">Full Screen</span>
+                )}
+              </div>
               <span className="text-[10px] text-zinc-500 font-mono block -mt-0.5">Packet Tracer Assistant</span>
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {/* Fullscreen / Maximize Toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 rounded-lg text-zinc-500 hover:text-white hover:bg-white/[0.06]"
+              onClick={() => setIsMaximized(!isMaximized)}
+              title={isMaximized ? "Restore size" : "Expand to full screen"}
+            >
+              {isMaximized ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+            </Button>
+            {/* Clear Chat */}
             <Button
               variant="ghost"
               size="icon"
@@ -171,6 +255,7 @@ export default function ChatPanel() {
             >
               <Trash2 size={13} />
             </Button>
+            {/* Close Copilot */}
             <Button 
               variant="ghost" 
               size="icon" 
@@ -185,85 +270,89 @@ export default function ChatPanel() {
 
         {/* Message Thread */}
         <div className="flex-1 p-4 overflow-y-auto space-y-4 font-sans scrollbar-none">
-          {/* Context Banner */}
-          {state.diagnosis?.diagnosis && (
-            <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs flex items-center gap-2 text-blue-300">
-              <Sparkles size={13} className="flex-shrink-0 text-blue-400" />
-              <span className="line-clamp-1 text-[11px]">
-                Attached Context: {state.diagnosis.diagnosis?.root_cause || 'Active Diagnosis'}
-              </span>
-            </div>
-          )}
+          <div className={cn("space-y-4", isMaximized && "max-w-4xl mx-auto")}>
+            {/* Context Banner */}
+            {state.diagnosis?.diagnosis && (
+              <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs flex items-center gap-2 text-blue-300 shadow-sm">
+                <Sparkles size={13} className="flex-shrink-0 text-blue-400" />
+                <span className="line-clamp-1 text-[11px]">
+                  Attached Context: {state.diagnosis.diagnosis?.root_cause || 'Active Diagnosis'}
+                </span>
+              </div>
+            )}
 
-          {/* Messages */}
-          {messages.map((msg) => {
-            const isUser = msg.role === 'user';
-            return (
-              <div 
-                key={msg.id} 
-                className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} space-y-1`}
-              >
+            {/* Messages */}
+            {messages.map((msg) => {
+              const isUser = msg.role === 'user';
+              return (
                 <div 
-                  className={`p-3 rounded-2xl text-xs leading-relaxed max-w-[90%] break-words ${
-                    isUser 
-                      ? 'bg-blue-600 text-white rounded-br-none shadow-md shadow-blue-600/20' 
-                      : 'bg-muted/40 text-foreground border border-border/80 rounded-bl-none'
-                  }`}
+                  key={msg.id} 
+                  className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} space-y-1`}
                 >
-                  <ChatMessageContent content={msg.content} isUser={isUser} />
-                </div>
-                <span className="text-[9px] text-zinc-500 px-1 font-mono">{msg.timestamp}</span>
-              </div>
-            );
-          })}
-
-          {isStreaming && (
-            <div className="flex items-center gap-2 text-xs text-blue-400 py-1">
-              <Loader2 size={12} className="animate-spin" />
-              <span className="text-[11px]">Copilot is typing...</span>
-            </div>
-          )}
-
-          <div ref={messagesEndRef} />
-
-          {/* Quick Suggestions */}
-          {messages.length < 3 && (
-            <div className="space-y-2 pt-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 px-1">
-                Suggested Prompts
-              </span>
-              <div className="space-y-1.5">
-                {quickPrompts.map((p, i) => (
-                  <button
-                    key={i}
-                    onClick={() => sendMessage(p)}
-                    className="w-full text-left p-2.5 rounded-xl bg-muted/30 hover:bg-muted/70 border border-border/60 text-xs text-foreground transition-all flex items-center justify-between group"
+                  <div 
+                    className={cn(
+                      "p-3.5 rounded-2xl text-xs leading-relaxed break-words transition-all",
+                      isUser 
+                        ? 'bg-blue-600 text-white rounded-br-none shadow-md shadow-blue-600/20 max-w-[85%]' 
+                        : 'bg-muted/40 text-foreground border border-border/80 rounded-bl-none shadow-sm',
+                      isMaximized && !isUser ? 'max-w-full w-full' : 'max-w-[92%]'
+                    )}
                   >
-                    <span className="line-clamp-1 text-[11px]">{p}</span>
-                    <ChevronRight size={12} className="text-zinc-600 group-hover:text-white transition-colors flex-shrink-0" />
-                  </button>
-                ))}
+                    <ChatMessageContent content={msg.content} isUser={isUser} />
+                  </div>
+                  <span className="text-[9px] text-zinc-500 px-1 font-mono">{msg.timestamp}</span>
+                </div>
+              );
+            })}
+
+            {isStreaming && (
+              <div className="flex items-center gap-2 text-xs text-blue-400 py-1">
+                <Loader2 size={12} className="animate-spin" />
+                <span className="text-[11px]">Copilot is typing...</span>
               </div>
-            </div>
-          )}
+            )}
+
+            <div ref={messagesEndRef} />
+
+            {/* Quick Suggestions */}
+            {messages.length < 3 && (
+              <div className="space-y-2 pt-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 px-1">
+                  Suggested Prompts
+                </span>
+                <div className={cn("space-y-1.5", isMaximized && "grid grid-cols-2 gap-2 space-y-0")}>
+                  {quickPrompts.map((p, i) => (
+                    <button
+                      key={i}
+                      onClick={() => sendMessage(p)}
+                      className="w-full text-left p-2.5 rounded-xl bg-muted/30 hover:bg-muted/70 border border-border/60 text-xs text-foreground transition-all flex items-center justify-between group"
+                    >
+                      <span className="line-clamp-1 text-[11px]">{p}</span>
+                      <ChevronRight size={12} className="text-zinc-600 group-hover:text-white transition-colors flex-shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Input Footer */}
         <div className="p-3.5 border-t border-border bg-muted/20 flex-shrink-0">
-          <div className="flex items-center gap-2 p-1.5 rounded-xl bg-background border border-border focus-within:border-primary/50 transition-colors">
+          <div className={cn("flex items-center gap-2 p-1.5 rounded-xl bg-background border border-border focus-within:border-primary/50 transition-colors shadow-inner", isMaximized && "max-w-4xl mx-auto")}>
             <input 
               type="text" 
-              placeholder="Ask Copilot about trace..." 
+              placeholder="Ask Copilot about trace, commands, or concepts..." 
               value={inputMessage}
               disabled={isStreaming}
               onChange={(e) => setInputMessage(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-              className="w-full text-xs bg-transparent px-2.5 py-1 text-foreground placeholder:text-muted-foreground focus:outline-none" 
+              className="w-full text-xs bg-transparent px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground focus:outline-none" 
             />
             <Button 
               size="icon" 
               disabled={isStreaming || !inputMessage.trim()}
-              className="h-7 w-7 rounded-lg bg-blue-600 hover:bg-blue-500 text-white flex-shrink-0 disabled:opacity-40" 
+              className="h-7 w-7 rounded-lg bg-blue-600 hover:bg-blue-500 text-white flex-shrink-0 disabled:opacity-40 shadow-sm" 
               onClick={() => sendMessage()}
             >
               <Send size={12} />
