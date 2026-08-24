@@ -61,7 +61,10 @@ export function AppProvider({ children }) {
     const poll = async () => {
       try {
         const res = await fetch('/api/live');
-        const data = await res.json();
+        if (!res.ok) return;
+        const text = await res.text();
+        if (!text) return;
+        const data = JSON.parse(text);
         if (data.exists && data.is_fresh) {
           dispatch({ type: 'SET_LIVE_STATUS', payload: { active: true, text: 'Live Sync' } });
           dispatch({ type: 'SET_CLI_INPUT', payload: data.content });
@@ -69,10 +72,10 @@ export function AppProvider({ children }) {
           dispatch({ type: 'SET_LIVE_STATUS', payload: { active: false, text: 'Standby' } });
         }
       } catch (e) {
-        console.error('Poll error', e);
+        // Silently handle empty responses during dev reloads
       }
     };
-    const interval = setInterval(poll, 1200);
+    const interval = setInterval(poll, 1500);
     poll();
     return () => clearInterval(interval);
   }, []);
