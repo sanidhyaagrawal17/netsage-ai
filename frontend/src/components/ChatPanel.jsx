@@ -1,3 +1,4 @@
+import ChatMessageContent from './ChatMessageContent';
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageSquare, X, Send, Sparkles, Terminal, ChevronRight, Bot, Trash2, Layers, Loader2 } from 'lucide-react';
 import { Button } from './ui/button';
@@ -209,7 +210,7 @@ export default function ChatPanel() {
                       : 'bg-muted/40 text-foreground border border-border/80 rounded-bl-none'
                   }`}
                 >
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                  <ChatMessageContent content={msg.content} isUser={isUser} />
                 </div>
                 <span className="text-[9px] text-zinc-500 px-1 font-mono">{msg.timestamp}</span>
               </div>
