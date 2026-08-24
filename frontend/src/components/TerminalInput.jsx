@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { toast } from 'sonner';
 import { Play, Bot, Trash2, Copy, Wifi, WifiOff, Clipboard } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { parseCiscoPrompt } from '../lib/ciscoParser';
 
 export default function TerminalInput() {
   const { state, dispatch } = useAppContext();
@@ -142,6 +143,7 @@ export default function TerminalInput() {
   if (state.activeView !== 'tab-input') return null;
 
   const isWaiting = !state.cliInput || state.cliInput.startsWith('# Waiting');
+  const promptInfo = parseCiscoPrompt(state.cliInput);
 
   return (
     <section className="flex-1 flex flex-col p-6 overflow-hidden">
@@ -238,6 +240,12 @@ export default function TerminalInput() {
         <div className="flex items-center justify-between flex-shrink-0">
           <span className="text-xs text-muted-foreground font-mono">
             {lineCount} lines · {(state.cliInput || '').length} chars
+            {promptInfo.mode !== 'Unknown' && (
+              <>
+                <span className="mx-2">·</span>
+                <span className="text-blue-400 font-medium">{promptInfo.mode}</span>
+              </>
+            )}
           </span>
           <Button onClick={handleDiagnose} disabled={isDiagnosing || isWaiting} className="gap-2">
             <Play size={14} />
