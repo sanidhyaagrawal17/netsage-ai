@@ -12,6 +12,16 @@ NetSage AI is an intelligent, dual-stage network diagnostic copilot engineered f
 
 ---
 
+## 🎥 Live Demonstration
+
+https://github.com/sanidhyaagrawal17/netsage-ai/raw/main/docs/assets/copilot_demo.mp4
+
+> **⚡ NetSage AI in Action**: Live Cisco Packet Tracer clipboard ingestion, deterministic OSI heuristic analysis, and conversational Copilot reasoning with isolated, copyable Cisco IOS remediation blocks.
+
+---
+
+---
+
 ## ✨ Key Features
 
 - **⚡ Stage 1: Deterministic Heuristic Engine (`checker.py`)**
