@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
-import { Play, Bot, Trash2, Copy, Wifi, WifiOff, Clipboard } from 'lucide-react';
+import { Play, Bot, Trash2, Copy, Wifi, WifiOff, Clipboard, HelpCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { parseCiscoPrompt } from '../lib/ciscoParser';
 
@@ -11,6 +11,7 @@ export default function TerminalInput() {
   const [isDiagnosing, setIsDiagnosing] = useState(false);
   const [listenerRunning, setListenerRunning] = useState(false);
   const [lineCount, setLineCount] = useState(1);
+  const [selectedText, setSelectedText] = useState('');
   const textareaRef = useRef(null);
   const lineNumbersRef = useRef(null);
 
@@ -34,37 +35,68 @@ export default function TerminalInput() {
     }
   };
 
-  const toggleListener = async () => {
-    const ep = listenerRunning ? '/api/listener/stop' : '/api/listener/start';
-    try {
-      const r = await fetch(ep, { method: 'POST' });
-      const d = await r.json();
-      const nowRunning = d.status === 'started' || d.status === 'already_running';
-      setListenerRunning(nowRunning);
-      toast.success(nowRunning ? 'PT Listener started — monitoring clipboard' : 'PT Listener stopped');
-    } catch (e) {
-      toast.error('Failed to toggle listener');
+  const handleSelect = (e) => {
+    const start = e.target.selectionStart;
+    const end = e.target.selectionEnd;
+    if (start !== end) {
+      const text = state.cliInput.substring(start, end).trim();
+      if (text.length > 5) {
+        setSelectedText(text);
+      } else {
+        setSelectedText('');
+      }
+    } else {
+      setSelectedText('');
     }
+  };
+
+  const explainSelection = () => {
+    if (!selectedText) return;
+    dispatch({
+      type: 'SET_COPILOT_PROMPT',
+      payload: `Explain this Cisco CLI snippet in plain language for a networking student:\n\n\`\`\`cisco\n${selectedText}\n\`\`\``
+    });
+    toast.info("Sent snippet to NetSage Copilot");
+  };
+
+  const copyToClipboard = () => {
+    if (!state.cliInput) return;
+    navigator.clipboard.writeText(state.cliInput);
+    toast.success('CLI buffer copied to clipboard');
   };
 
   const pasteFromClipboard = async () => {
     try {
       const text = await navigator.clipboard.readText();
-      dispatch({ type: 'SET_CLI_INPUT', payload: text });
-      toast.success('Pasted from clipboard');
-    } catch {
-      toast.error('Clipboard access denied');
+      if (text) {
+        dispatch({ type: 'SET_CLI_INPUT', payload: text });
+        toast.success('Pasted from clipboard');
+      }
+    } catch (e) {
+      toast.error('Could not access clipboard');
     }
   };
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(state.cliInput);
-    toast.success('Copied to clipboard');
+  const toggleListener = async () => {
+    try {
+      const endpoint = listenerRunning ? '/api/listener/stop' : '/api/listener/start';
+      const res = await fetch(endpoint, { method: 'POST' });
+      const data = await res.json();
+      if (data.status === 'started' || data.status === 'already_running') {
+        setListenerRunning(true);
+        toast.success('Packet Tracer Clipboard Listener active');
+      } else {
+        setListenerRunning(false);
+        toast.info('Clipboard Listener stopped');
+      }
+    } catch (e) {
+      toast.error('Failed to toggle listener');
+    }
   };
 
   const handleDiagnose = async () => {
-    if (!state.cliInput || state.cliInput.startsWith('# Waiting')) {
-      toast.error('Please provide CLI input first.');
+    if (!state.cliInput || state.cliInput.trim().length === 0 || state.cliInput.startsWith('# Waiting')) {
+      toast.error('Please paste Cisco IOS CLI output first');
       return;
     }
 
@@ -74,6 +106,8 @@ export default function TerminalInput() {
     dispatch({ type: 'SET_DIAGNOSIS', payload: null });
     dispatch({ type: 'SET_STREAMED_RAW', payload: '' });
 
+    const promptDetails = parseCiscoPrompt(state.cliInput);
+
     try {
       const res = await fetch('/api/diagnose/stream', {
         method: 'POST',
@@ -81,8 +115,10 @@ export default function TerminalInput() {
         body: JSON.stringify({
           case_id: 'LIVE-PT-SESSION',
           symptom: 'Capturing live network anomaly from your active Cisco Packet Tracer terminal...',
+          topology_note: `CLI Context: ${promptDetails.mode}\nLast Prompt: ${promptDetails.prompt}`,
           show_outputs: state.cliInput,
           osi_layer: 'Network',
+          model_name: state.currentModel,
         }),
       });
 
@@ -125,9 +161,31 @@ export default function TerminalInput() {
         const jsonMatch = rawJson.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           const finalData = JSON.parse(jsonMatch[0]);
-          dispatch({ type: 'SET_DIAGNOSIS', payload: { case_id: 'LIVE-PT-SESSION', deterministic_findings: currentFindings, diagnosis: finalData } });
+          const diagnosisPayload = { case_id: 'LIVE-PT-SESSION', deterministic_findings: currentFindings, diagnosis: finalData };
+          dispatch({ type: 'SET_DIAGNOSIS', payload: diagnosisPayload });
           dispatch({ type: 'SET_STREAMED_RAW', payload: '' });
-          toast.success('Analysis complete');
+
+          // Auto-save to Diagnosis History
+          dispatch({
+            type: 'ADD_HISTORY_ENTRY',
+            payload: {
+              id: 'diag-' + Date.now(),
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              date: new Date().toLocaleDateString(),
+              caseId: finalData?.case_id || 'LIVE-PT-SESSION',
+              rootCause: finalData?.root_cause || 'Network Anomaly Detected',
+              osiLayer: finalData?.osi_layer || 'Network',
+              confidence: Math.round((finalData?.confidence_score || 0.95) * 100),
+              fixSteps: finalData?.fix_steps || [],
+              cliEvidence: finalData?.cli_evidence_quote || '',
+              cliInput: state.cliInput,
+              modelUsed: state.currentModel,
+              approved: false,
+              diagnosisObj: diagnosisPayload,
+            }
+          });
+
+          toast.success('Diagnostic analysis complete');
         }
       } catch (e) {
         console.error('Final parse error', e);
@@ -151,10 +209,21 @@ export default function TerminalInput() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold tracking-tight">CLI Capture</h1>
+            <h1 className="text-lg font-semibold tracking-tight text-foreground">CLI Capture</h1>
             <p className="text-sm text-muted-foreground">Paste Cisco IOS output or enable the clipboard listener.</p>
           </div>
           <div className="flex items-center gap-2">
+            {selectedText && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={explainSelection}
+                className="gap-1.5 rounded-xl text-xs h-8 bg-blue-600/10 border-blue-500/30 text-blue-400 hover:bg-blue-600/20"
+              >
+                <HelpCircle size={13} />
+                <span>Explain Selected Snippet</span>
+              </Button>
+            )}
             <Button
               variant={listenerRunning ? "default" : "outline"}
               size="sm"
@@ -230,6 +299,7 @@ export default function TerminalInput() {
               spellCheck="false"
               value={state.cliInput}
               onChange={(e) => dispatch({ type: 'SET_CLI_INPUT', payload: e.target.value })}
+              onSelect={handleSelect}
               onScroll={handleScroll}
               placeholder="Paste your Cisco IOS CLI output here, or start the PT Listener..."
             />
@@ -247,7 +317,7 @@ export default function TerminalInput() {
               </>
             )}
           </span>
-          <Button onClick={handleDiagnose} disabled={isDiagnosing || isWaiting} className="gap-2">
+          <Button onClick={handleDiagnose} disabled={isDiagnosing || isWaiting} className="gap-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-lg shadow-blue-600/20">
             <Play size={14} />
             {isDiagnosing ? 'Analyzing...' : 'Run Diagnostic Engine'}
           </Button>

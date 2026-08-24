@@ -10,6 +10,7 @@ Provides REST APIs for:
 """
 
 from __future__ import annotations
+import requests
 
 import datetime
 import json
@@ -28,7 +29,7 @@ from pydantic import BaseModel
 
 # Local diagnostic engines
 from checker import run_all_checks, extract_relevant_context
-from llm_engine import log_telemetry_and_audit, query_local_slm, query_local_slm_stream
+from llm_engine import log_telemetry_and_audit, query_local_slm, query_local_slm_stream, chat_slm_stream
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -85,6 +86,20 @@ class ReviewRequest(BaseModel):
 
 
 # --- REST API Endpoints ---
+
+
+@app.get("/api/models")
+def get_available_models():
+    """Return list of locally installed Ollama models."""
+    try:
+        r = requests.get("http://localhost:11434/api/tags", timeout=2.0)
+        if r.status_code == 200:
+            models = [m.get("name") for m in r.json().get("models", [])]
+            return {"online": True, "models": models, "active": "qwen2.5-coder:3b" if "qwen2.5-coder:3b" in models else (models[0] if models else "mock-slm")}
+    except Exception:
+        pass
+    return {"online": False, "models": ["qwen2.5-coder:3b (offline fallback)"], "active": "qwen2.5-coder:3b"}
+
 
 @app.get("/api/cases")
 def get_cases():
@@ -213,6 +228,33 @@ def run_diagnosis_stream(req: DiagnoseRequest):
         yield f"data: {json.dumps({'type': 'done'})}\n\n"
 
     return StreamingResponse(generate_events(), media_type="text/event-stream")
+
+
+
+class ChatRequest(BaseModel):
+    message: str
+    context: Optional[str] = ""
+    history: Optional[List[Dict[str, str]]] = []
+    model_name: Optional[str] = "qwen2.5-coder:3b"
+    ollama_host: Optional[str] = "http://localhost:11434"
+
+
+@app.post("/api/chat/stream")
+def run_chat_stream(req: ChatRequest):
+    """Stream conversational Copilot assistance via SSE."""
+    def generate_chat_events():
+        token_stream = chat_slm_stream(
+            message=req.message,
+            context=req.context or "",
+            history=req.history or [],
+            model_name=req.model_name or "qwen2.5-coder:3b",
+            ollama_host=req.ollama_host or "http://localhost:11434",
+        )
+        for token in token_stream:
+            yield f"data: {json.dumps({'type': 'token', 'token': token})}\n\n"
+        yield f"data: {json.dumps({'type': 'done'})}\n\n"
+
+    return StreamingResponse(generate_chat_events(), media_type="text/event-stream")
 
 
 @app.post("/api/review")

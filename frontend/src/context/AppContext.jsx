@@ -2,6 +2,15 @@ import React, { createContext, useContext, useReducer, useEffect } from 'react';
 
 const AppContext = createContext();
 
+const initialHistory = (() => {
+  try {
+    const saved = localStorage.getItem('netsage_history');
+    return saved ? JSON.parse(saved) : [];
+  } catch (e) {
+    return [];
+  }
+})();
+
 const initialState = {
   activeView: 'tab-input',
   theme: localStorage.getItem('netsage_theme') || 'dark',
@@ -9,9 +18,18 @@ const initialState = {
   aiStatus: 'idle', // 'idle' | 'rules' | 'thinking' | 'streaming' | 'offline'
   diagnosis: null,
   streamedRaw: '',
-  diagnosisHistory: [], // Placeholder for phase 3
+  diagnosisHistory: initialHistory,
+  chatMessages: [
+    {
+      id: 'welcome-1',
+      role: 'assistant',
+      content: 'Hello! I am **NetSage Copilot**.\n\nI can explain network anomalies, decode Cisco IOS CLI outputs, and guide you through Packet Tracer configuration fixes. What would you like to explore?',
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    }
+  ],
+  pendingCopilotPrompt: '',
   cliInput: '# Waiting for Packet Tracer CLI capture...\n# 1. Start python pt_listener.py\n# 2. Copy any show-command output in Packet Tracer.',
-  currentModel: 'llama3.1:8b',
+  currentModel: 'qwen2.5-coder:3b',
   isCopilotOpen: true,
   isSidebarCollapsed: false,
 };
@@ -42,6 +60,38 @@ function reducer(state, action) {
       return { ...state, isSidebarCollapsed: !state.isSidebarCollapsed };
     case 'SET_SIDEBAR_COLLAPSED':
       return { ...state, isSidebarCollapsed: action.payload };
+    case 'ADD_HISTORY_ENTRY': {
+      const updated = [action.payload, ...state.diagnosisHistory.filter(h => h.id !== action.payload.id)].slice(0, 50);
+      try { localStorage.setItem('netsage_history', JSON.stringify(updated)); } catch (e) {}
+      return { ...state, diagnosisHistory: updated };
+    }
+    case 'UPDATE_HISTORY_ENTRY': {
+      const updated = state.diagnosisHistory.map(h => h.id === action.payload.id ? { ...h, ...action.payload.updates } : h);
+      try { localStorage.setItem('netsage_history', JSON.stringify(updated)); } catch (e) {}
+      return { ...state, diagnosisHistory: updated };
+    }
+    case 'DELETE_HISTORY_ENTRY': {
+      const updated = state.diagnosisHistory.filter(h => h.id !== action.payload);
+      try { localStorage.setItem('netsage_history', JSON.stringify(updated)); } catch (e) {}
+      return { ...state, diagnosisHistory: updated };
+    }
+    case 'CLEAR_HISTORY': {
+      try { localStorage.removeItem('netsage_history'); } catch (e) {}
+      return { ...state, diagnosisHistory: [] };
+    }
+    case 'ADD_CHAT_MESSAGE':
+      return { ...state, chatMessages: [...state.chatMessages, action.payload] };
+    case 'UPDATE_LAST_CHAT_MESSAGE': {
+      if (state.chatMessages.length === 0) return state;
+      const newMsgs = [...state.chatMessages];
+      const lastIdx = newMsgs.length - 1;
+      newMsgs[lastIdx] = { ...newMsgs[lastIdx], content: action.payload };
+      return { ...state, chatMessages: newMsgs };
+    }
+    case 'CLEAR_CHAT':
+      return { ...state, chatMessages: [] };
+    case 'SET_COPILOT_PROMPT':
+      return { ...state, pendingCopilotPrompt: action.payload, isCopilotOpen: true };
     default:
       return state;
   }

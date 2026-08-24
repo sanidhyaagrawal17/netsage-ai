@@ -378,3 +378,98 @@ if __name__ == "__main__":
     result = query_local_slm(sample_template, sample_case)
     print("Diagnosis Result with Telemetry:")
     print(json.dumps(result, indent=2))
+
+def chat_slm_stream(
+    message: str,
+    context: Optional[str] = "",
+    history: Optional[List[Dict[str, str]]] = None,
+    model_name: str = "qwen2.5-coder:3b",
+    ollama_host: str = "http://localhost:11434",
+):
+    """Stream conversational Copilot response for Cisco Packet Tracer tutoring."""
+    system_instruction = (
+        "You are NetSage Copilot, an expert AI network engineering tutor for students using Cisco Packet Tracer. "
+        "Explain network anomalies, Cisco IOS CLI commands (show, config, interface, routing, VLAN, ACL, NAT, STP), "
+        "and troubleshooting methodologies concisely and clearly. Keep explanations pedagogical, clear, and actionable. "
+        "Format commands and snippets cleanly with Markdown code blocks."
+    )
+    
+    prompt_parts = [f"System: {system_instruction}"]
+    if context:
+        prompt_parts.append(f"Current Network Context & Active Diagnosis:\n{context}")
+    if history:
+        for turn in history[-6:]:
+            role = turn.get("role", "user")
+            content = turn.get("content", "")
+            prompt_parts.append(f"{role.capitalize()}: {content}")
+    prompt_parts.append(f"User: {message}\nAssistant:")
+    
+    full_prompt = "\n\n".join(prompt_parts)
+    endpoint = f"{ollama_host.rstrip('/')}/api/generate"
+    payload = {
+        "model": model_name,
+        "prompt": full_prompt,
+        "stream": True,
+        "options": {
+            "temperature": 0.3,
+            "top_p": 0.9,
+            "num_ctx": 4096,
+        },
+    }
+    
+    try:
+        response = requests.post(endpoint, json=payload, stream=True, timeout=10.0)
+        response.raise_for_status()
+        for line in response.iter_lines():
+            if line:
+                data = json.loads(line)
+                token = data.get("response", "")
+                if token:
+                    yield token
+    except Exception as exc:
+        logger.warning(f"Ollama chat streaming offline/fallback: {exc}")
+        msg_lower = message.lower()
+        if "vlan" in msg_lower:
+            fallback = (
+                "**VLAN Diagnostic Analysis:**\n\n"
+                "1. **Root Cause:** A VLAN mismatch or missing 802.1Q encapsulation prevents inter-switch packet forwarding.\n"
+                "2. **Verification:** Run `show interfaces trunk` and `show vlan brief` on both connected switches.\n"
+                "3. **Recommended Fix:** Ensure access ports are assigned to the correct VLAN (`switchport access vlan <id>`) and trunk native VLANs match on both ends."
+            )
+        elif "ospf" in msg_lower or "routing" in msg_lower:
+            fallback = (
+                "**OSPF Routing Analysis:**\n\n"
+                "1. **Key Requirements for Adjacency:** Hello/Dead intervals, Subnet mask, Area ID, and MTU must match between neighbors.\n"
+                "2. **Verification Command:** Run `show ip ospf neighbor` and `show ip ospf interface`.\n"
+                "3. **Remediation:** Verify network statements under `router ospf <process-id>` and confirm interfaces are not set to `passive-interface` incorrectly."
+            )
+        elif "acl" in msg_lower or "block" in msg_lower or "filter" in msg_lower:
+            fallback = (
+                "**ACL & Security Evaluation:**\n\n"
+                "1. **Implicit Deny:** Remember all Cisco Standard and Extended ACLs conclude with an invisible `deny any` rule.\n"
+                "2. **Wildcard Masks:** Verify wildcard masks are standard inverted masks (e.g., `0.0.0.255` for `/24`), not subnet masks (`255.255.255.0`).\n"
+                "3. **Direction:** Ensure the access-group is applied in the correct direction (`ip access-group <name> in/out`)."
+            )
+        elif "explain" in msg_lower or "why" in msg_lower or "root cause" in msg_lower:
+            fallback = (
+                "**Root Cause Analysis:**\n\n"
+                "The active telemetry indicates a misconfiguration in the control plane or data plane configuration. "
+                "Cisco Packet Tracer devices will drop packets until both layer 2 encapsulation and layer 3 subnets are fully aligned.\n\n"
+                "- Verify physical link status (`show ip int brief`).\n"
+                "- Check route table resolution (`show ip route`).\n"
+                "- Apply the suggested remediation commands."
+            )
+        else:
+            ctx_summary = (context[:180] + '...') if context else 'General Cisco IOS Troubleshooting'
+            fallback = (
+                f"**NetSage Copilot Assessment:**\n\n"
+                f"Here is the recommended troubleshooting flow for your active scenario:\n\n"
+                f"1. **Interface Layer:** Confirm physical and protocol status (`show ip int brief`).\n"
+                f"2. **Forwarding Plane:** Inspect ARP and MAC tables (`show ip arp`, `show mac address-table`).\n"
+                f"3. **Routing & Policies:** Verify next-hop reachability and active ACLs.\n\n"
+                f"*Context:* {ctx_summary}"
+            )
+        
+        for chunk in fallback.split(' '):
+            yield chunk + ' '
+            time.sleep(0.02)
