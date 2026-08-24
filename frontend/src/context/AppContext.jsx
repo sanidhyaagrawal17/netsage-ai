@@ -15,6 +15,9 @@ const initialState = {
   activeView: 'tab-input',
   theme: localStorage.getItem('netsage_theme') || 'dark',
   liveStatus: { active: false, text: 'Standby' },
+  backendConnected: true,
+  isCopilotStreaming: false,
+  isPillDocked: true,
   aiStatus: 'idle', // 'idle' | 'rules' | 'thinking' | 'streaming' | 'offline'
   diagnosis: null,
   streamedRaw: '',
@@ -42,6 +45,14 @@ function reducer(state, action) {
       return { ...state, theme: action.payload };
     case 'SET_LIVE_STATUS':
       return { ...state, liveStatus: action.payload };
+    case 'SET_BACKEND_CONNECTED':
+      return { ...state, backendConnected: action.payload };
+    case 'SET_COPILOT_STREAMING':
+      return { ...state, isCopilotStreaming: action.payload };
+    case 'SET_PILL_DOCKED':
+      return { ...state, isPillDocked: action.payload };
+    case 'TOGGLE_PILL_DOCK':
+      return { ...state, isPillDocked: !state.isPillDocked };
     case 'SET_AI_STATUS':
       return { ...state, aiStatus: action.payload };
     case 'SET_DIAGNOSIS':
@@ -111,7 +122,11 @@ export function AppProvider({ children }) {
     const poll = async () => {
       try {
         const res = await fetch('/api/live');
-        if (!res.ok) return;
+        if (!res.ok) {
+          dispatch({ type: 'SET_BACKEND_CONNECTED', payload: false });
+          return;
+        }
+        dispatch({ type: 'SET_BACKEND_CONNECTED', payload: true });
         const text = await res.text();
         if (!text) return;
         const data = JSON.parse(text);
@@ -122,7 +137,7 @@ export function AppProvider({ children }) {
           dispatch({ type: 'SET_LIVE_STATUS', payload: { active: false, text: 'Standby' } });
         }
       } catch (e) {
-        // Silently handle empty responses during dev reloads
+        dispatch({ type: 'SET_BACKEND_CONNECTED', payload: false });
       }
     };
     const interval = setInterval(poll, 1500);
