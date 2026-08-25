@@ -9,50 +9,57 @@ import { useDraggable } from '../hooks/useDraggable';
 import { createPortal } from 'react-dom';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
+import { motion, AnimatePresence } from 'motion/react';
 import MiniCopilotChat from './MiniCopilotChat';
 import { toast } from 'sonner';
-
-const PIP_STYLES = `
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body {
-    width: 100vw; height: 100vh; margin: 0; padding: 0; overflow: hidden !important;
-    background: #09090b; color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-    font-size: 12px; user-select: text; -webkit-font-smoothing: antialiased;
-    scrollbar-width: none !important;
-  }
-  html::-webkit-scrollbar, body::-webkit-scrollbar { display: none !important; }
-  .pip-wrapper { display: flex; flex-direction: column; height: 100vh; background: #09090b; }
-  .pip-header { 
-    display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;
-    background: rgba(18, 18, 20, 0.95); border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; height: 42px;
-    backdrop-filter: blur(20px);
-  }
-  .pip-header-left { display: flex; align-items: center; gap: 8px; }
-  .pip-dot { width: 8px; height: 8px; border-radius: 50%; }
-  .pip-dot.idle { background: #10b981; box-shadow: 0 0 10px rgba(16,185,129,0.7); }
-  .pip-dot.thinking { background: #f59e0b; box-shadow: 0 0 12px rgba(245,158,11,0.8); }
-  .pip-dot.streaming { background: #06b6d4; box-shadow: 0 0 14px rgba(6,182,212,0.9); }
-  .pip-dot.rules { background: #a855f7; box-shadow: 0 0 12px rgba(168,85,247,0.8); }
-  .pip-title { font-weight: 600; letter-spacing: -0.01em; font-size: 12px; color: #ffffff; }
-  .pip-model-tag { 
-    font-family: ui-monospace, monospace; font-size: 10px; color: #71717a; 
-    background: rgba(255,255,255,0.05); padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.08);
-  }
-  .pip-btn {
-    background: transparent; border: none; color: #71717a; cursor: pointer;
-    padding: 5px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
-  }
-  .pip-btn:hover { background: rgba(255,255,255,0.08); color: #ffffff; }
-  .pip-body { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
-`;
 
 export default function FloatingStatus() {
   const { state, dispatch } = useAppContext();
   const [isExpanded, setIsExpanded] = useState(false);
   const [pipWindow, setPipWindow] = useState(null);
-  const [listenerRunning, setListenerRunning] = useState(false);
-  const [size, setSize] = useState({ width: 340, height: 440 });
+  const listenerRunning = state.isListenerRunning;
+  const [isTogglingListener, setIsTogglingListener] = useState(false);
+  const [size, setSize] = useState({ width: 350, height: 480 });
   const [isResizingWindow, setIsResizingWindow] = useState(false);
+
+  const [flavorText, setFlavorText] = useState('');
+  const [activeTimer, setActiveTimer] = useState(0);
+
+  const flavors = ['Charting the Stars', 'Analyzing Telemetry', 'Decoding Configs', 'Synthesizing Fix', 'Querying NetSage Core'];
+
+  useEffect(() => {
+    let interval;
+    if (state.aiStatus === 'thinking' || state.aiStatus === 'streaming') {
+      setFlavorText(flavors[0]);
+      setActiveTimer(0);
+      interval = setInterval(() => {
+        setActiveTimer(t => {
+          const newT = t + 1;
+          if (newT % 3 === 0) setFlavorText(flavors[Math.floor((newT / 3)) % flavors.length]);
+          return newT;
+        });
+      }, 1000);
+    } else {
+      setActiveTimer(0);
+      setFlavorText('');
+    }
+    // Smooth animation variants
+  const pillVariants = {
+    initial: { scale: 0.92, opacity: 0 },
+    animate: { scale: 1, opacity: 1 },
+    exit: { scale: 0.92, opacity: 0 }
+  };
+
+  const expandedVariants = {
+    initial: { scale: 0.92, opacity: 0 },
+    animate: { scale: 1, opacity: 1 },
+    exit: { scale: 0.92, opacity: 0 }
+  };
+
+  const transitionConfig = { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] };
+
+  return () => clearInterval(interval);
+  }, [state.aiStatus]);
 
   const pipContainerRef = useRef(null);
 
@@ -60,20 +67,7 @@ export default function FloatingStatus() {
   const defaultPos = { x: window.innerWidth - 380, y: 30 };
   const { position, isDragging, handlePointerDown } = useDraggable(defaultPos);
 
-  // Check PT listener status
-  useEffect(() => {
-    const checkListener = async () => {
-      try {
-        const res = await fetch('/api/listener/status');
-        if (!res.ok) return;
-        const data = await res.json();
-        setListenerRunning(!!data.running);
-      } catch (e) {}
-    };
-    checkListener();
-    const interval = setInterval(checkListener, 3000);
-    return () => clearInterval(interval);
-  }, []);
+
 
   // Sync PiP window closed
   useEffect(() => {
@@ -84,6 +78,21 @@ export default function FloatingStatus() {
   }, [pipWindow]);
 
   // Open Document Picture-in-Picture (OS Always-On-Top Window)
+    const handleToggleListener = async (e) => {
+    e.stopPropagation();
+    if (isTogglingListener) return;
+    setIsTogglingListener(true);
+    try {
+      const res = await fetch('/api/listener/toggle', { method: 'POST' });
+      const data = await res.json();
+      const isRunning = data.status === 'started' || !!data.running;
+      dispatch({ type: 'SET_LISTENER_RUNNING', payload: isRunning });
+    } catch (e) {}
+    finally {
+      setIsTogglingListener(false);
+    }
+  };
+
   const openPip = async () => {
     if (!('documentPictureInPicture' in window)) {
       toast.error('Document Picture-in-Picture is not supported in this browser.');
@@ -91,39 +100,99 @@ export default function FloatingStatus() {
     }
     try {
       const pip = await window.documentPictureInPicture.requestWindow({
-        width: 360,
-        height: 480,
+        width: 380,
+        height: 540,
       });
 
-      // Inject custom styling
-      const styleEl = pip.document.createElement('style');
-      styleEl.textContent = PIP_STYLES;
-      pip.document.head.appendChild(styleEl);
+      const pipDoc = pip.document;
+      const currentTheme = state.theme || 'dark';
 
-      // Copy document stylesheets
-      Array.from(document.styleSheets).forEach(sheet => {
+      // 1. Set theme and dark class on documentElement and body
+      pipDoc.documentElement.setAttribute('data-theme', currentTheme);
+      pipDoc.documentElement.className = currentTheme === 'dark' ? 'dark' : '';
+      pipDoc.body.setAttribute('data-theme', currentTheme);
+      pipDoc.body.className = `${currentTheme === 'dark' ? 'dark' : ''} bg-background text-foreground`;
+
+      // 2. Clone ALL style and link elements from parent document head
+      document.querySelectorAll('style, link[rel="stylesheet"]').forEach((el) => {
         try {
-          if (sheet.href) {
-            const link = pip.document.createElement('link');
-            link.rel = 'stylesheet';
-            link.href = sheet.href;
-            pip.document.head.appendChild(link);
-          } else if (sheet.cssRules) {
-            const inlineStyle = pip.document.createElement('style');
-            Array.from(sheet.cssRules).forEach(rule => {
-              inlineStyle.appendChild(pip.document.createTextNode(rule.cssText));
-            });
-            pip.document.head.appendChild(inlineStyle);
-          }
+          pipDoc.head.appendChild(el.cloneNode(true));
         } catch (e) {}
       });
 
-      const container = pip.document.createElement('div');
+      // 3. Extract all CSS rules from document.styleSheets to ensure 100% style parity
+      Array.from(document.styleSheets).forEach((sheet) => {
+        try {
+          if (sheet.cssRules && sheet.cssRules.length > 0) {
+            const newStyle = pipDoc.createElement('style');
+            let rulesText = '';
+            for (let i = 0; i < sheet.cssRules.length; i++) {
+              rulesText += sheet.cssRules[i].cssText + '\n';
+            }
+            newStyle.textContent = rulesText;
+            pipDoc.head.appendChild(newStyle);
+          }
+        } catch (e) {
+          // Cross-origin stylesheet fallback
+          if (sheet.href) {
+            const link = pipDoc.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = sheet.href;
+            pipDoc.head.appendChild(link);
+          }
+        }
+      });
+
+      // 4. Injected PiP base & scroll styles
+      const pipBaseStyle = pipDoc.createElement('style');
+      pipBaseStyle.textContent = `
+        *, *::before, *::after { box-sizing: border-box; }
+        html, body {
+          width: 100vw;
+          height: 100%;
+          margin: 0;
+          padding: 0;
+          overflow: hidden;
+          background: #09090b !important;
+          color: #f4f4f5 !important;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Inter, sans-serif;
+          -webkit-font-smoothing: antialiased;
+        }
+                .scrollbar-mini {
+          scrollbar-width: thin !important;
+          scrollbar-color: rgba(255, 255, 255, 0.3) transparent !important;
+        }
+        .scrollbar-mini::-webkit-scrollbar {
+          width: 5px !important;
+          height: 5px !important;
+          display: block !important;
+        }
+        .scrollbar-mini::-webkit-scrollbar-track {
+          background: transparent !important;
+        }
+        .scrollbar-mini::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.3) !important;
+          border-radius: 9999px !important;
+        }
+        .scrollbar-mini::-webkit-scrollbar-thumb:hover {
+          background: rgba(255, 255, 255, 0.5) !important;
+        }
+        #pip-root {
+          width: 100vw;
+          height: 100%;
+          max-height: 100%;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+          background: #09090b;
+        }
+      `;
+      pipDoc.head.appendChild(pipBaseStyle);
+
+      // Create root container
+      const container = pipDoc.createElement('div');
       container.id = 'pip-root';
-      container.style.height = '100vh';
-      container.style.display = 'flex';
-      container.style.flexDirection = 'column';
-      pip.document.body.appendChild(container);
+      pipDoc.body.appendChild(container);
       pipContainerRef.current = container;
 
       setPipWindow(pip);
@@ -146,7 +215,6 @@ export default function FloatingStatus() {
     if (e) e.stopPropagation();
     setIsExpanded(false);
     dispatch({ type: 'SET_PILL_DOCKED', payload: true });
-    toast.success('Pill docked back into navigation sidebar');
   };
 
   // Handle drag resizing of the expanded floating window
@@ -183,7 +251,10 @@ export default function FloatingStatus() {
     offline: { label: 'Offline', color: 'bg-rose-500', glow: 'shadow-[0_0_10px_rgba(244,63,94,0.7)] animate-pulse' }
   };
 
-  const currentConfig = statusConfigs[state.aiStatus] || statusConfigs.idle;
+  const currentConfig = { ...(statusConfigs[state.aiStatus] || statusConfigs.idle) };
+  if (state.aiStatus === 'thinking' || state.aiStatus === 'streaming') {
+    currentConfig.label = `${flavorText}... (${activeTimer}s)`;
+  }
 
   // If pill is docked in sidebar, do not render floating widget
   if (state.isPillDocked) {
@@ -191,25 +262,20 @@ export default function FloatingStatus() {
   }
 
   // PiP Window Component
-  const PipWindowComponent = () => (
-    <div className="pip-wrapper">
-      <div className="pip-header">
-        <div className="pip-header-left">
-          <span className={cn("pip-dot", state.aiStatus)}></span>
-          <span className="pip-title">NetSage Copilot</span>
-          <span className="pip-model-tag">{state.currentModel}</span>
-        </div>
-        <div className="pip-header-right" style={{ display: 'flex', gap: '4px' }}>
-          <button className="pip-btn" onClick={closePip} title="Close Always-On-Top Window">
-            <X size={13} />
-          </button>
-        </div>
-      </div>
-      <div className="pip-body">
-        <MiniCopilotChat isPiP={true} />
-      </div>
-    </div>
-  );
+  // Smooth animation variants
+  const pillVariants = {
+    initial: { scale: 0.92, opacity: 0 },
+    animate: { scale: 1, opacity: 1 },
+    exit: { scale: 0.92, opacity: 0 }
+  };
+
+  const expandedVariants = {
+    initial: { scale: 0.92, opacity: 0 },
+    animate: { scale: 1, opacity: 1 },
+    exit: { scale: 0.92, opacity: 0 }
+  };
+
+  const transitionConfig = { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] };
 
   return (
     <>
@@ -225,144 +291,201 @@ export default function FloatingStatus() {
           touchAction: 'none'
         }}
       >
-        {pipWindow ? (
-          <div 
-            className="flex items-center gap-3 px-4 py-2 glass-pill rounded-full cursor-pointer hover:border-border transition-all duration-200 active:scale-95 group shadow-2xl"
-            title="Viewing in Always-On-Top Window. Click to restore."
-            onClick={closePip}
-          >
-            <span className={cn("w-2 h-2 rounded-full", currentConfig.color, currentConfig.glow)} />
-            <span className="text-xs font-semibold text-foreground tracking-tight">PiP Active</span>
-            <RotateCcw size={12} className="text-muted-foreground group-hover:text-foreground transition-colors" />
-          </div>
-        ) : isExpanded ? (
-          
-          /* Expanded Floating Mini Copilot Window */
-          <div 
-            className="flex flex-col glass-pill rounded-2xl overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9),0_0_0_1px_rgba(255,255,255,0.12)] border border-border" 
-            style={{ width: size.width, height: size.height }}
-          >
-            {/* Header */}
-            <div 
-              className={cn(
-                "flex items-center justify-between px-3.5 py-2.5 bg-muted/40 border-b border-border select-none", 
-                isDragging ? 'cursor-grabbing' : 'cursor-grab'
-              )}
-              onMouseDown={handlePointerDown}
-              onTouchStart={handlePointerDown}
+        <AnimatePresence>
+
+          {pipWindow ? (
+            /* PiP Active Badge */
+            <motion.div 
+              key="pip-badge"
+              variants={pillVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={transitionConfig}
+              className="flex items-center gap-3 px-4 py-2 glass-pill rounded-full cursor-pointer hover:border-border transition-all duration-200 active:scale-95 group shadow-2xl"
+              title="Viewing in Always-On-Top Window. Click to restore."
+              onClick={closePip}
             >
-              <div className="flex items-center gap-2">
-                <GripVertical size={13} className="text-muted-foreground opacity-60" />
-                <span className={cn("w-2 h-2 rounded-full", currentConfig.color, currentConfig.glow)} />
-                <span className="text-xs font-semibold text-foreground tracking-tight">NetSage Mini</span>
-                <span className="text-[9px] font-mono text-muted-foreground bg-muted/80 border border-border px-1.5 py-0.2 rounded">
-                  {state.currentModel}
-                </span>
-              </div>
-              
-              <div className="flex items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
-                {'documentPictureInPicture' in window && (
+              <span className={cn("w-2 h-2 rounded-full", currentConfig.color, currentConfig.glow)} />
+              <span className="text-xs font-semibold text-foreground tracking-tight">PiP Active</span>
+              <RotateCcw size={12} className="text-muted-foreground group-hover:text-foreground transition-colors" />
+            </motion.div>
+
+          ) : isExpanded ? (
+            
+            /* Expanded Floating Mini Copilot Window */
+            <motion.div 
+              key="expanded-window"
+              variants={expandedVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={transitionConfig}
+              className="grid grid-rows-[auto_1fr] glass-pill rounded-2xl overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.9),0_0_0_1px_rgba(255,255,255,0.12)] border border-border" 
+              style={{ width: size.width, height: size.height }}
+            >
+              {/* Header */}
+              <div 
+                className={cn(
+                  "flex items-center justify-between px-3.5 py-2.5 bg-muted/40 border-b border-border select-none flex-shrink-0", 
+                  isDragging ? 'cursor-grabbing' : 'cursor-grab'
+                )}
+                onMouseDown={handlePointerDown}
+                onTouchStart={handlePointerDown}
+              >
+                <div className="flex items-center gap-2">
+                  <GripVertical size={13} className="text-muted-foreground opacity-60" />
+                  <span className={cn("w-2 h-2 rounded-full", currentConfig.color, currentConfig.glow)} />
+                  <span className="text-xs font-semibold text-foreground tracking-tight">NetSage Mini <span className="text-muted-foreground font-normal ml-1 border-l border-border pl-2">{currentConfig.label}</span></span>
+                  <span className="text-[9px] font-mono text-muted-foreground bg-muted/80 border border-border px-1.5 py-0.2 rounded">
+                    {state.currentModel}
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-1" onMouseDown={(e) => e.stopPropagation()}>
+                  {'documentPictureInPicture' in window && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80" 
+                      onClick={openPip} 
+                      title="Pop out into OS Always-On-Top Window"
+                    >
+                      <ExternalLink size={12} />
+                    </Button>
+                  )}
                   <Button 
                     variant="ghost" 
                     size="icon" 
                     className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80" 
-                    onClick={openPip} 
-                    title="Pop out into OS Always-On-Top Window"
+                    onClick={() => setIsExpanded(false)} 
+                    title="Collapse to Pill"
                   >
-                    <ExternalLink size={12} />
+                    <Minimize2 size={12} />
                   </Button>
-                )}
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80" 
-                  onClick={() => setIsExpanded(false)} 
-                  title="Collapse to Pill"
-                >
-                  <Minimize2 size={12} />
-                </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80" 
-                  onClick={handleDockToSidebar} 
-                  title="Dock back to Sidebar"
-                >
-                  <Pin size={12} />
-                </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/80" 
+                    onClick={handleDockToSidebar} 
+                    title="Dock back to Sidebar"
+                  >
+                    <Pin size={12} />
+                  </Button>
+                </div>
               </div>
-            </div>
 
-            {/* Chat Body */}
-            <div className="flex-1 overflow-hidden">
-              <MiniCopilotChat />
-            </div>
+              {/* Chat Body with min-h-0 */}
+              <div className="min-h-0 h-full overflow-hidden">
+                <MiniCopilotChat />
+              </div>
 
-            {/* Resize Corner Handle */}
-            <div 
-              className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize flex items-end justify-end p-1 select-none z-20" 
-              onMouseDown={startResize} 
-              title="Drag to resize window"
-            >
-              <div className="w-2 h-2 border-r-2 border-b-2 border-muted-foreground/60 rounded-br-[2px]" />
-            </div>
-          </div>
+              {/* Resize Corner Handle */}
+              <div 
+                className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize flex items-end justify-end p-1 select-none z-20" 
+                onMouseDown={startResize} 
+                title="Drag to resize window"
+              >
+                <div className="w-2 h-2 border-r-2 border-b-2 border-muted-foreground/60 rounded-br-[2px]" />
+              </div>
+            </motion.div>
 
-        ) : (
+          ) : (
 
-          /* Collapsed Draggable Floating Pill */
-          <div 
-            className={cn(
-              "flex items-center gap-2.5 px-3.5 py-2 glass-pill rounded-full transition-all duration-150 shadow-2xl",
-              "hover:border-border hover:scale-[1.03] active:scale-[0.97]",
-              isDragging ? "cursor-grabbing scale-105" : "cursor-grab"
-            )}
-            onClick={() => !isDragging && setIsExpanded(true)}
-            onDoubleClick={handleDockToSidebar}
-            onMouseDown={handlePointerDown}
-            onTouchStart={handlePointerDown}
-            title="Click to open Mini Copilot • Double click to Dock back to Sidebar"
-          >
-            <GripVertical size={13} className="text-muted-foreground opacity-60 group-hover:opacity-100" />
-            <span className={cn("w-2 h-2 rounded-full", currentConfig.color, currentConfig.glow)} />
-            
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-foreground tracking-tight">
-                {currentConfig.label}
-              </span>
-              <span className="text-[10px] font-mono text-muted-foreground bg-muted/80 px-2 py-0.5 rounded-full border border-border">
-                {state.currentModel}
-              </span>
-            </div>
-
-            {/* PT Indicator */}
-            <span className="text-border">|</span>
-            <div className="flex items-center gap-1 text-[10px] text-muted-foreground" title={listenerRunning ? 'Packet Tracer Sync Active' : 'Packet Tracer Sync Offline'}>
-              {listenerRunning ? (
-                <Wifi size={12} className="text-emerald-400" />
-              ) : (
-                <WifiOff size={12} className="text-zinc-500" />
+            /* Collapsed Draggable Floating Pill */
+            <motion.div 
+              key="collapsed-pill"
+              variants={pillVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={transitionConfig}
+              className={cn(
+                "flex items-center gap-2.5 px-3.5 py-2 glass-pill rounded-full transition-colors duration-150 shadow-2xl",
+                "hover:border-border",
+                isDragging ? "cursor-grabbing scale-105" : "cursor-grab"
               )}
-            </div>
-
-            {/* Quick Dock Button */}
-            <button 
-              onClick={handleDockToSidebar}
-              className="p-0.5 rounded hover:bg-white/10 text-muted-foreground hover:text-white transition-colors ml-1"
-              title="Dock back to Sidebar"
+              onClick={() => !isDragging && setIsExpanded(true)}
+              onDoubleClick={handleDockToSidebar}
+              onMouseDown={handlePointerDown}
+              onTouchStart={handlePointerDown}
+              title="Click to open Mini Copilot · Double click to Dock"
             >
-              <Pin size={11} />
-            </button>
-          </div>
+              <GripVertical size={13} className="text-muted-foreground opacity-60" />
+              <span className={cn("w-2 h-2 rounded-full", currentConfig.color, currentConfig.glow)} />
+              
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-foreground tracking-tight">
+                  {currentConfig.label}
+                </span>
+                <span className="text-[10px] font-mono text-muted-foreground bg-muted/80 px-2 py-0.5 rounded-full border border-border">
+                  {state.currentModel}
+                </span>
+              </div>
 
-        )}
+              {/* PT Indicator */}
+              <span className="text-border">|</span>
+              <button 
+                onClick={handleToggleListener}
+                className="flex items-center gap-1 text-[10px] p-0.5 rounded hover:bg-white/10 transition-colors" 
+                title={listenerRunning ? 'Packet Tracer Sync Active (Click to Pause)' : 'Packet Tracer Sync Offline (Click to Start)'}
+              >
+                {listenerRunning ? (
+                  <Wifi size={12} className="text-emerald-400" />
+                ) : (
+                  <WifiOff size={12} className="text-zinc-500" />
+                )}
+              </button>
+
+              {/* Quick Dock Button */}
+              <button 
+                onClick={handleDockToSidebar}
+                className="p-0.5 rounded hover:bg-white/10 text-muted-foreground hover:text-white transition-colors ml-1"
+                title="Dock back to Sidebar"
+              >
+                <Pin size={11} />
+              </button>
+            </motion.div>
+
+          )}
+
+        </AnimatePresence>
       </div>
 
       {/* PiP Portal */}
       {pipWindow && pipContainerRef.current && createPortal(
-        <PipWindowComponent />,
-        pipContainerRef.current
-      )}
-    </>
-  );
+        <div className="grid grid-rows-[auto_1fr] h-full w-full bg-card text-foreground font-sans select-text overflow-hidden">
+      {/* Header */}
+      <header className="h-11 flex items-center justify-between px-3 border-b border-border bg-card/95 backdrop-blur flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <span className={cn("w-2 h-2 rounded-full", currentConfig.color, currentConfig.glow)} />
+          <span className="font-semibold text-xs text-foreground tracking-tight">NetSage Copilot <span className="text-muted-foreground font-normal ml-1 border-l border-border pl-2">{currentConfig.label}</span></span>
+          <span className="text-[10px] font-mono text-muted-foreground bg-muted/80 border border-border px-1.5 py-0.5 rounded">
+            {state.currentModel}
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-7 w-7 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/80" 
+            onClick={closePip} 
+            title="Close Pop-out Window"
+          >
+            <X size={13} />
+          </Button>
+        </div>
+      </header>
+      
+      {/* Chat Body */}
+      <div className="min-h-0 h-full overflow-hidden">
+        <MiniCopilotChat isPiP={true} />
+        </div>
+      </div>,
+      pipContainerRef.current
+    )}
+  </>
+);
+
+
 }

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MessageSquare, X, Send, Sparkles, Terminal, ChevronRight, Bot, Trash2, Layers, Loader2, Maximize2, Minimize2 } from 'lucide-react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import { MessageSquare, X, Send, Sparkles, Terminal, ChevronRight, Bot, Trash2, Layers, Loader2, Maximize2, Minimize2, Square, Edit2, ChevronLeft, Brain } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAppContext } from '../context/AppContext';
 import { motion, AnimatePresence } from 'motion/react';
@@ -26,13 +26,40 @@ export default function ChatPanel() {
 
   const messages = state.chatMessages || [];
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const messagesContainerRef = useRef(null);
+  const isAutoScrollEnabled = useRef(true);
+  const abortControllerRef = useRef(null);
+  const textareaRef = useRef(null);
+
+  const handleScroll = () => {
+    if (!messagesContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 80;
+    isAutoScrollEnabled.current = isNearBottom;
   };
 
-  useEffect(() => {
-    scrollToBottom();
+  useLayoutEffect(() => {
+    if (messagesContainerRef.current && isAutoScrollEnabled.current) {
+      requestAnimationFrame(() => {
+        if (messagesContainerRef.current) {
+          messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+        }
+      });
+    }
   }, [messages, isStreaming]);
+
+    // Auto-resize textarea when inputMessage changes (e.g. typing, pasting, clearing)
+  useEffect(() => {
+    if (textareaRef.current) {
+      if (!inputMessage) {
+        textareaRef.current.style.height = '34px';
+      } else {
+        textareaRef.current.style.height = 'auto';
+        const newHeight = Math.min(textareaRef.current.scrollHeight, 180);
+        textareaRef.current.style.height = `${Math.max(34, newHeight)}px`;
+      }
+    }
+  }, [inputMessage]);
 
   // Handle pending prompt passed from other components (e.g. selection or diagnosis)
   useEffect(() => {
@@ -80,36 +107,76 @@ export default function ChatPanel() {
     "How does an inverted wildcard mask cause ACL drops?"
   ];
 
-  const sendMessage = async (textToSend) => {
+  const stopGeneration = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsStreaming(false);
+    dispatch({ type: 'SET_COPILOT_STREAMING', payload: false });
+    dispatch({ type: 'SET_AI_STATUS', payload: 'idle' });
+    toast.info('Generation stopped');
+  };
+
+  const sendMessage = async (textToSend, isBranch = false, branchUserIdx = null) => {
     const query = textToSend || inputMessage;
     if (!query || !query.trim() || isStreaming) return;
 
-    setInputMessage('');
+    if (!isBranch) {
+      setInputMessage('');
+    }
+    isAutoScrollEnabled.current = true;
 
-    // 1. Add User Message
-    const userMsg = {
-      id: 'msg-' + Date.now(),
-      role: 'user',
-      content: query.trim(),
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-    dispatch({ type: 'ADD_CHAT_MESSAGE', payload: userMsg });
+    // Create Abort Controller
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const abortCtrl = new AbortController();
+    abortControllerRef.current = abortCtrl;
 
-    // 2. Add Assistant Message placeholder
-    const assistantMsgId = 'msg-' + (Date.now() + 1);
-    dispatch({
-      type: 'ADD_CHAT_MESSAGE',
-      payload: {
-        id: assistantMsgId,
-        role: 'assistant',
-        content: '',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }
-    });
+    let historyPayload = [];
+
+    if (isBranch && branchUserIdx !== null) {
+      const assistantMsgId = 'msg-' + (Date.now() + 1);
+      dispatch({
+        type: 'BRANCH_CHAT_MESSAGE',
+        payload: {
+          userMsgIndex: branchUserIdx,
+          newPrompt: query.trim(),
+          newAssistantMsgId: assistantMsgId
+        }
+      });
+      historyPayload = messages.slice(0, branchUserIdx).map(m => ({ role: m.role, content: m.content }));
+    } else {
+      const userMsg = {
+        id: 'msg-' + Date.now(),
+        role: 'user',
+        content: query.trim(),
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        versions: [query.trim()],
+        currentVersionIndex: 0
+      };
+      dispatch({ type: 'ADD_CHAT_MESSAGE', payload: userMsg });
+
+      const assistantMsgId = 'msg-' + (Date.now() + 1);
+      dispatch({
+        type: 'ADD_CHAT_MESSAGE',
+        payload: {
+          id: assistantMsgId,
+          role: 'assistant',
+          content: '',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          versions: [''],
+          currentVersionIndex: 0
+        }
+      });
+      historyPayload = messages.map(m => ({ role: m.role, content: m.content }));
+    }
 
     setIsStreaming(true);
+    dispatch({ type: 'SET_COPILOT_STREAMING', payload: true });
+    dispatch({ type: 'SET_AI_STATUS', payload: 'thinking' });
 
-    // Build context
     let activeContext = '';
     if (state.diagnosis?.diagnosis) {
       const d = state.diagnosis.diagnosis;
@@ -120,11 +187,10 @@ export default function ChatPanel() {
     }
 
     try {
-      const historyPayload = messages.map(m => ({ role: m.role, content: m.content }));
-
       const res = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: abortCtrl.signal,
         body: JSON.stringify({
           message: query.trim(),
           context: activeContext,
@@ -138,10 +204,12 @@ export default function ChatPanel() {
       }
 
       const reader = res.body.getReader();
+      dispatch({ type: 'SET_AI_STATUS', payload: 'streaming' });
       const decoder = new TextDecoder('utf-8');
       let streamedAnswer = '';
       let done = false;
 
+      let lastDispatch = 0;
       while (!done) {
         const { value, done: readerDone } = await reader.read();
         if (readerDone) break;
@@ -155,7 +223,12 @@ export default function ChatPanel() {
               const event = JSON.parse(dataStr);
               if (event.type === 'token') {
                 streamedAnswer += event.token;
-                dispatch({ type: 'UPDATE_LAST_CHAT_MESSAGE', payload: streamedAnswer });
+                const now = performance.now();
+                // Throttle React state updates to ~25fps (every 40ms) to eliminate frontend UI freezing
+                if (now - lastDispatch > 40) {
+                  lastDispatch = now;
+                  dispatch({ type: 'UPDATE_LAST_CHAT_MESSAGE', payload: streamedAnswer });
+                }
               } else if (event.type === 'done') {
                 done = true;
               }
@@ -165,15 +238,48 @@ export default function ChatPanel() {
           }
         }
       }
+      // Ensure final complete text is always dispatched
+      dispatch({ type: 'UPDATE_LAST_CHAT_MESSAGE', payload: streamedAnswer });
     } catch (e) {
-      toast.error('Chat error: ' + e.message);
-      dispatch({ 
-        type: 'UPDATE_LAST_CHAT_MESSAGE', 
-        payload: '⚠️ Could not generate response. Please ensure the backend server is running.' 
-      });
+      if (e.name === 'AbortError') {
+        // Handled stop
+      } else {
+        toast.error('Chat error: ' + e.message);
+        dispatch({ 
+          type: 'UPDATE_LAST_CHAT_MESSAGE', 
+          payload: '⚠️ Could not generate response. Please ensure the backend server is running.' 
+        });
+      }
     } finally {
       setIsStreaming(false);
+      dispatch({ type: 'SET_COPILOT_STREAMING', payload: false });
+      dispatch({ type: 'SET_AI_STATUS', payload: 'idle' });
+      abortControllerRef.current = null;
     }
+  };
+
+  const handleStartEdit = (idx, currentContent) => {
+    setEditingIndex(idx);
+    setEditText(currentContent);
+  };
+
+  const handleSaveEdit = (idx) => {
+    if (!editText.trim()) return;
+    setEditingIndex(null);
+    sendMessage(editText.trim(), true, idx);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingIndex(null);
+    setEditText('');
+  };
+
+  const switchVersion = (userMsgIndex, targetIdx) => {
+    if (isStreaming) return;
+    dispatch({
+      type: 'SWITCH_CHAT_VERSION',
+      payload: { userMsgIndex, targetVersionIndex: targetIdx }
+    });
   };
 
   const handleClearChat = () => {
@@ -269,7 +375,7 @@ export default function ChatPanel() {
         </header>
 
         {/* Message Thread */}
-        <div className="flex-1 p-4 overflow-y-auto space-y-4 font-sans scrollbar-none">
+        <div className="flex-1 p-4 overflow-y-auto space-y-4 font-sans scrollbar-mini">
           <div className={cn("space-y-4", isMaximized && "max-w-4xl mx-auto")}>
             {/* Context Banner */}
             {state.diagnosis?.diagnosis && (
@@ -306,9 +412,29 @@ export default function ChatPanel() {
             })}
 
             {isStreaming && (
-              <div className="flex items-center gap-2 text-xs text-blue-400 py-1">
-                <Loader2 size={12} className="animate-spin" />
-                <span className="text-[11px]">Copilot is typing...</span>
+              <div className="flex items-center justify-between gap-1.5 text-xs py-1 px-1 animate-fadeIn">
+                <div className="flex items-center gap-2">
+                  {state.aiStatus === 'thinking' ? (
+                    <>
+                      <Brain size={13} className="text-amber-400 animate-pulse" />
+                      <span className="text-xs text-amber-400 font-medium">Reasoning...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Loader2 size={13} className="animate-spin text-blue-400" />
+                      <span className="text-xs text-blue-400 font-medium">Generating solution...</span>
+                    </>
+                  )}
+                </div>
+
+                {/* Inline Stop Button */}
+                <button
+                  onClick={stopGeneration}
+                  className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-medium transition-colors"
+                >
+                  <Square size={10} className="fill-current" />
+                  <span>Stop</span>
+                </button>
               </div>
             )}
 
@@ -339,20 +465,27 @@ export default function ChatPanel() {
 
         {/* Input Footer */}
         <div className="p-3.5 border-t border-border bg-muted/20 flex-shrink-0">
-          <div className={cn("flex items-center gap-2 p-1.5 rounded-xl bg-background border border-border focus-within:border-primary/50 transition-colors shadow-inner", isMaximized && "max-w-4xl mx-auto")}>
-            <input 
-              type="text" 
-              placeholder="Ask Copilot about trace, commands, or concepts..." 
+          <div className={cn("flex items-end gap-2 p-1.5 rounded-xl bg-background border border-border focus-within:border-primary/50 transition-colors shadow-inner", isMaximized && "max-w-4xl mx-auto")}>
+            <textarea 
+              ref={textareaRef}
+              rows={1}
+              placeholder="Ask Copilot... (Shift+Enter for newline)" 
               value={inputMessage}
               disabled={isStreaming}
               onChange={(e) => setInputMessage(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-              className="w-full text-xs bg-transparent px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground focus:outline-none" 
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
+              className="w-full text-xs bg-transparent px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground focus:outline-none resize-none overflow-y-auto h-[34px] min-h-[34px] scrollbar-none leading-relaxed" 
+              style={{ maxHeight: '180px' }}
             />
             <Button 
               size="icon" 
               disabled={isStreaming || !inputMessage.trim()}
-              className="h-7 w-7 rounded-lg bg-blue-600 hover:bg-blue-500 text-white flex-shrink-0 disabled:opacity-40 shadow-sm" 
+              className="h-7 w-7 rounded-lg bg-blue-600 hover:bg-blue-500 text-white flex-shrink-0 disabled:opacity-40 shadow-sm mb-0.5" 
               onClick={() => sendMessage()}
             >
               <Send size={12} />

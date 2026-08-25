@@ -593,6 +593,49 @@ def check_l7_services(show_output: str) -> List[Dict[str, Any]]:
     return anomalies
 
 
+
+def parse_cdp_neighbors(show_output: str) -> str:
+    """Parse 'show cdp neighbors' to build a topology map."""
+    lines = show_output.splitlines()
+    connections = []
+    
+    # Simple table parsing logic
+    # Looking for lines like: Switch1          Gig 0/0           120        S I         2960      Gig 0/1
+    # Note: Sometimes Device ID is long and wraps to next line, but we do best effort here.
+    
+    import re
+    # Match DeviceID (no spaces), Local Interface (letters+spaces+numbers/slashes), ..., Remote Port ID
+    # This is a basic heuristics regex.
+    for line in lines:
+        line = line.strip()
+        # Skip headers or empty lines
+        if not line or "Device ID" in line or "Holdtme" in line or "Capability" in line or "Total cdp entries" in line:
+            continue
+            
+        parts = line.split()
+        if len(parts) >= 6 and parts[-1][0].isdigit() or (len(parts)>2 and "/" in parts[-1]):
+            # A rough heuristic: first token is remote device, last tokens are remote port
+            remote_device = parts[0]
+            remote_port = parts[-1]
+            if len(parts) > 6 and not parts[-2].isdigit():
+                remote_port = parts[-2] + " " + parts[-1]
+            
+            # Find local interface (usually the 2nd and sometimes 3rd token)
+            local_iface = ""
+            for i in range(1, len(parts)-3):
+                if any(char.isdigit() for char in parts[i]):
+                    local_iface = parts[i]
+                    if i > 1 and not any(char.isdigit() for char in parts[i-1]):
+                         local_iface = parts[i-1] + " " + parts[i]
+                    break
+            
+            if local_iface and remote_port:
+                connections.append(f"Local {local_iface} is connected to {remote_device} on {remote_port}")
+                
+    if connections:
+        return "Discovered Topology:\n" + "\n".join(f"- {c}" for c in connections)
+    return ""
+
 def run_all_checks(show_output: str, metadata: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     """Run all deterministic validation rules across Layer 2 to Layer 7.
 

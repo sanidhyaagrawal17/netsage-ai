@@ -105,14 +105,14 @@
 /* Glassmorphism utilities */
 .glass-panel {
   background: rgba(12, 12, 14, 0.75);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .glass-pill {
-  backdrop-filter: blur(24px) saturate(200%);
-  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(0, 0, 0, 0.12);
   box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.04), inset 0 1px 0 0 rgba(255, 255, 255, 0.8);
@@ -157,4 +157,26 @@
   display: none !important;
   width: 0 !important;
   height: 0 !important;
+}
+
+/* Custom Mini Scrollbar */
+.scrollbar-mini {
+  overflow-anchor: none;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(255, 255, 255, 0.25) transparent !important;
+}
+.scrollbar-mini::-webkit-scrollbar {
+  width: 5px !important;
+  height: 5px !important;
+  display: block !important;
+}
+.scrollbar-mini::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+.scrollbar-mini::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25) !important;
+  border-radius: 9999px !important;
+}
+.scrollbar-mini::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.45) !important;
 }

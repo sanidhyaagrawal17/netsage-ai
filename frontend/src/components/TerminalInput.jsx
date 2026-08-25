@@ -2,26 +2,18 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
-import { Play, Bot, Trash2, Copy, Wifi, WifiOff, Clipboard, HelpCircle } from 'lucide-react';
+import { Play, Bot, Trash2, Copy, Wifi, WifiOff, Clipboard, HelpCircle, Map, Info } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { parseCiscoPrompt } from '../lib/ciscoParser';
 
 export default function TerminalInput() {
   const { state, dispatch } = useAppContext();
   const [isDiagnosing, setIsDiagnosing] = useState(false);
-  const [listenerRunning, setListenerRunning] = useState(false);
+  const listenerRunning = state.isListenerRunning;
   const [lineCount, setLineCount] = useState(1);
   const [selectedText, setSelectedText] = useState('');
   const textareaRef = useRef(null);
   const lineNumbersRef = useRef(null);
-
-  // Sync listener status
-  useEffect(() => {
-    const poll = () => fetch('/api/listener/status').then(r => r.json()).then(d => setListenerRunning(d.running)).catch(() => {});
-    poll();
-    const iv = setInterval(poll, 3000);
-    return () => clearInterval(iv);
-  }, []);
 
   // Sync line numbers with textarea scroll
   useEffect(() => {
@@ -77,20 +69,48 @@ export default function TerminalInput() {
     }
   };
 
+  const [isTogglingListener, setIsTogglingListener] = useState(false);
   const toggleListener = async () => {
+    if (isTogglingListener) return;
+    setIsTogglingListener(true);
     try {
-      const endpoint = listenerRunning ? '/api/listener/stop' : '/api/listener/start';
-      const res = await fetch(endpoint, { method: 'POST' });
+      const res = await fetch('/api/listener/toggle', { method: 'POST' });
       const data = await res.json();
-      if (data.status === 'started' || data.status === 'already_running') {
-        setListenerRunning(true);
-        toast.success('Packet Tracer Clipboard Listener active');
+      const isRunning = data.status === 'started' || !!data.running;
+      dispatch({ type: 'SET_LISTENER_RUNNING', payload: isRunning });
+      toast.success(isRunning ? 'Packet Tracer Clipboard Listener active' : 'Clipboard Listener stopped');
+    } catch (e) {
+      toast.error('Failed to toggle listener: ' + e.message);
+    } finally {
+      setIsTogglingListener(false);
+    }
+  };
+
+  const [isDiscoveringTopology, setIsDiscoveringTopology] = useState(false);
+
+  const discoverTopology = async () => {
+    if (!state.cliInput.trim()) {
+      toast.error('Paste "show cdp neighbors" output first!');
+      return;
+    }
+    setIsDiscoveringTopology(true);
+    try {
+      const res = await fetch('/api/topology/discover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cli_text: state.cliInput })
+      });
+      const data = await res.json();
+      if (data.status === 'success' && data.topology) {
+        dispatch({ type: 'SET_TOPOLOGY_NOTE', payload: data.topology });
+        toast.success('Topology discovered successfully!');
       } else {
-        setListenerRunning(false);
-        toast.info('Clipboard Listener stopped');
+        toast.error('No CDP neighbors found in the input.');
       }
     } catch (e) {
-      toast.error('Failed to toggle listener');
+      toast.error('Failed to discover topology');
+    } finally {
+      setIsDiscoveringTopology(false);
     }
   };
 

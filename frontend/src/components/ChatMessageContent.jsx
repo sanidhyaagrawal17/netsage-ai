@@ -1,17 +1,24 @@
 import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Copy, Check, Terminal, Code2 } from 'lucide-react';
+import { Copy, Check, Terminal, Code2, Bot, Brain, Loader2, Sparkles, ChevronDown, ChevronRight } from 'lucide-react';
+import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
+import { useAppContext } from '../context/AppContext';
 
 function CodeBlock({ language, value }) {
   const [copied, setCopied] = useState(false);
+  const { state } = useAppContext();
+  const isGenerating = state.aiStatus === 'streaming' || state.aiStatus === 'thinking';
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(value);
+    // Strip standard Cisco prompts before copying
+    // Matches "Router> ", "Switch(config)# ", "Core-Router(config-if)# " etc.
+    const cleanValue = value.replace(/^[a-zA-Z0-9_\-\.]+.*?[>#]\s+/gm, '');
+    navigator.clipboard.writeText(cleanValue);
     setCopied(true);
-    toast.success('Commands copied to clipboard');
+    toast.success('Commands copied (prompts removed)');
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -29,12 +36,13 @@ function CodeBlock({ language, value }) {
             {language || 'cisco ios'}
           </span>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleCopy}
-          className="h-6 px-2 text-[10px] gap-1 text-zinc-400 hover:text-white hover:bg-white/10 rounded-md transition-colors"
-        >
+        {!isGenerating && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleCopy}
+            className="h-6 px-2 text-[10px] gap-1 text-zinc-400 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+          >
           {copied ? (
             <>
               <Check size={11} className="text-emerald-400" />
@@ -46,7 +54,8 @@ function CodeBlock({ language, value }) {
               <span>Copy</span>
             </>
           )}
-        </Button>
+          </Button>
+        )}
       </div>
 
       {/* Code Body */}
@@ -57,13 +66,61 @@ function CodeBlock({ language, value }) {
   );
 }
 
-export default function ChatMessageContent({ content, isUser }) {
+const ChatMessageContent = React.memo(function ChatMessageContent({ content, isUser }) {
   if (isUser) {
     return <p className="whitespace-pre-wrap text-xs text-white leading-relaxed">{content}</p>;
   }
 
+  // Check if thoughts are actively streaming (unclosed tag)
+  const isActivelyThinking = (content.includes('<think>') && !content.includes('</think>')) || 
+                             (content.includes('<thought>') && !content.includes('</thought>'));
+
+  // Extract <thought> and <think> blocks
+  const thinkRegex = /<(think|thought)>([\s\S]*?)(?:<\/\1>|$)/gi;
+  const thoughts = [];
+  
+  const processedContent = content.replace(thinkRegex, (match, tag, innerText) => {
+    thoughts.push(innerText.trim());
+    return ''; // Remove from main markdown
+  });
+
   return (
     <div className="chat-markdown text-xs leading-relaxed text-foreground space-y-2">
+      {thoughts.map((thought, i) => {
+        const isCurrentThoughtActive = isActivelyThinking && i === thoughts.length - 1;
+        return (
+          <details 
+            key={i} 
+            defaultOpen={isCurrentThoughtActive}
+            className="mb-2.5 group rounded-lg border border-border/40 bg-muted/20 overflow-hidden transition-all duration-200"
+          >
+            <summary className="cursor-pointer flex items-center justify-between px-2.5 py-1.5 text-[11px] font-mono text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors select-none">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground/60 transition-transform group-open:rotate-90">
+                  ▶
+                </span>
+                <span className="flex items-center gap-1.5 font-medium">
+                  {isCurrentThoughtActive ? (
+                    <>
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping" />
+                      <span className="text-amber-400/90">Thinking...</span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">Thought Process</span>
+                  )}
+                </span>
+              </div>
+              <span className="text-[10px] text-muted-foreground/50 font-mono">
+                {isCurrentThoughtActive ? 'in progress' : `${(thought.split(/\s+/).length)} words`}
+              </span>
+            </summary>
+            <div className="px-3 py-2 text-[11px] font-mono text-muted-foreground/80 border-t border-border/20 bg-background/50 leading-relaxed whitespace-pre-wrap max-h-56 overflow-y-auto scrollbar-mini">
+              {thought || '...'}
+            </div>
+          </details>
+        );
+      })}
+
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
@@ -86,13 +143,13 @@ export default function ChatMessageContent({ content, isUser }) {
             <em className="text-zinc-400 italic" {...props} />
           ),
           ul: ({ node, ...props }) => (
-            <ul className="list-disc pl-4 space-y-1 my-1.5 text-zinc-300" {...props} />
+            <ul className="list-disc pl-5 space-y-2.5 my-3 text-zinc-200 marker:text-zinc-500" {...props} />
           ),
           ol: ({ node, ...props }) => (
-            <ol className="list-decimal pl-4 space-y-1 my-1.5 text-zinc-300" {...props} />
+            <ol className="list-decimal pl-5 space-y-2.5 my-3 text-zinc-200 marker:text-zinc-500" {...props} />
           ),
           li: ({ node, ...props }) => (
-            <li className="leading-relaxed" {...props} />
+            <li className="leading-relaxed pl-1.5" {...props} />
           ),
           blockquote: ({ node, ...props }) => (
             <blockquote className="border-l-2 border-blue-500/50 pl-3 my-2 text-zinc-400 italic bg-blue-500/[0.04] py-1 rounded-r-lg" {...props} />
@@ -117,8 +174,10 @@ export default function ChatMessageContent({ content, isUser }) {
           },
         }}
       >
-        {content}
+        {processedContent}
       </ReactMarkdown>
     </div>
   );
-}
+});
+
+export default ChatMessageContent;

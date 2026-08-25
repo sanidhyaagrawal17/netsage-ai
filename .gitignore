@@ -31,3 +31,8 @@ Thumbs.db
 .vscode/
 *.swp
 *.swo
+
+# User logs and temp data
+benchmark_paper_results.csv
+responsible_ai_log.csv
+.tempmediaStorage/

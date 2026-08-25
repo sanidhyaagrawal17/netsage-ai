@@ -22,6 +22,8 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 import uvicorn
 from fastapi import FastAPI, HTTPException
+from starlette.middleware.gzip import GZipMiddleware
+import threading
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -49,6 +51,52 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
+
+
+
+
+
+def _prewarm_ollama_model():
+    """Stealth pre-warm: Wait 20 seconds so startup is fast, then use 1 thread to quietly load model to RAM."""
+    import time
+    time.sleep(20.0)  # Wait for system to settle
+    try:
+        import requests
+        url = "http://localhost:11434/api/generate"
+        payload = {
+            "model": "qwen2.5-coder:3b",
+            "prompt": "",  # Empty prompt
+            "stream": False,
+            "keep_alive": "30m",
+            "options": {
+                "num_predict": 1,
+                "num_ctx": 128,
+                "num_thread": 1
+            }
+        }
+        requests.post(url, json=payload, timeout=30.0)
+        print("Ollama model pre-warmed into RAM (Stealth Mode).", flush=True)
+    except Exception as exc:
+        print(f"Ollama pre-warm notice: {exc}", flush=True)
+
+@app.on_event("startup")
+def on_startup():
+    import threading
+    threading.Thread(target=_prewarm_ollama_model, daemon=True).start()
+
+
+class TopologyRequest(BaseModel):
+    cli_text: str
+
+@app.post("/api/topology/discover")
+async def discover_topology(req: TopologyRequest):
+    from checker import parse_cdp_neighbors
+    topology = parse_cdp_neighbors(req.cli_text)
+    if not topology:
+        return {"topology": "", "status": "not_found"}
+    return {"topology": topology, "status": "success"}
 
 def load_prompt_template() -> str:
     if not PROMPT_FILE.exists():
@@ -295,6 +343,24 @@ if STATIC_DIR.exists():
 # --- Listener Management ---
 import subprocess as _sp
 _listener_proc = None
+
+@app.post("/api/listener/toggle")
+def toggle_listener():
+    global _listener_proc
+    if _listener_proc and _listener_proc.poll() is None:
+        _listener_proc.terminate()
+        _listener_proc = None
+        return {"status": "stopped", "running": False}
+    try:
+        _listener_proc = _sp.Popen(
+            ["python", "pt_listener.py"],
+            cwd=str(Path(__file__).parent),
+            creationflags=_sp.CREATE_NO_WINDOW if hasattr(_sp, "CREATE_NO_WINDOW") else 0,
+        )
+        return {"status": "started", "running": True, "pid": _listener_proc.pid}
+    except Exception as e:
+        return {"status": "error", "running": False, "detail": str(e)}
+
 
 @app.post("/api/listener/start")
 def start_listener():

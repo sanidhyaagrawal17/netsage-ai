@@ -26,23 +26,10 @@ import { toast } from 'sonner';
 export default function Sidebar() {
   const { state, dispatch } = useAppContext();
   const isCollapsed = state.isSidebarCollapsed;
-  const [listenerRunning, setListenerRunning] = useState(false);
+  const listenerRunning = state.isListenerRunning;
   const [isTogglingListener, setIsTogglingListener] = useState(false);
 
-  // Sync listener status
-  useEffect(() => {
-    const checkListener = async () => {
-      try {
-        const res = await fetch('/api/listener/status');
-        if (!res.ok) return;
-        const data = await res.json();
-        setListenerRunning(!!data.running);
-      } catch (e) {}
-    };
-    checkListener();
-    const interval = setInterval(checkListener, 2500);
-    return () => clearInterval(interval);
-  }, []);
+
 
   const toggleListener = async () => {
     if (isTogglingListener) return;
@@ -50,8 +37,9 @@ export default function Sidebar() {
     try {
       const res = await fetch('/api/listener/toggle', { method: 'POST' });
       const data = await res.json();
-      setListenerRunning(data.status === 'started');
-      toast.success(data.status === 'started' ? 'PT clipboard listener started' : 'PT listener stopped');
+      const isRunning = data.status === 'started' || !!data.running;
+      dispatch({ type: 'SET_LISTENER_RUNNING', payload: isRunning });
+      toast.success(isRunning ? 'PT clipboard sync started' : 'PT sync stopped');
     } catch (e) {
       toast.error('Failed to toggle PT listener: ' + e.message);
     } finally {

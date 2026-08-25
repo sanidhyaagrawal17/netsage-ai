@@ -35,6 +35,7 @@ const initialState = {
   currentModel: 'qwen2.5-coder:3b',
   isCopilotOpen: true,
   isSidebarCollapsed: false,
+    isListenerRunning: false,
 };
 
 function reducer(state, action) {
@@ -45,6 +46,8 @@ function reducer(state, action) {
       return { ...state, theme: action.payload };
     case 'SET_LIVE_STATUS':
       return { ...state, liveStatus: action.payload };
+    case 'SET_LISTENER_RUNNING':
+      return { ...state, isListenerRunning: action.payload };
     case 'SET_BACKEND_CONNECTED':
       return { ...state, backendConnected: action.payload };
     case 'SET_COPILOT_STREAMING':
@@ -67,6 +70,8 @@ function reducer(state, action) {
       return { ...state, isCopilotOpen: !state.isCopilotOpen };
     case 'SET_COPILOT_OPEN':
       return { ...state, isCopilotOpen: action.payload };
+    case 'SET_TOPOLOGY_NOTE':
+      return { ...state, topologyNote: action.payload };
     case 'TOGGLE_SIDEBAR':
       return { ...state, isSidebarCollapsed: !state.isSidebarCollapsed };
     case 'SET_SIDEBAR_COLLAPSED':
@@ -92,11 +97,87 @@ function reducer(state, action) {
     }
     case 'ADD_CHAT_MESSAGE':
       return { ...state, chatMessages: [...state.chatMessages, action.payload] };
+    case 'SET_CHAT_MESSAGES':
+      return { ...state, chatMessages: action.payload };
+    case 'BRANCH_CHAT_MESSAGE': {
+      const { userMsgIndex, newPrompt, newAssistantMsgId } = action.payload;
+      const msgs = [...state.chatMessages];
+      const targetUser = msgs[userMsgIndex];
+      const targetAssistant = msgs[userMsgIndex + 1];
+
+      // Update user message versions
+      const userVersions = targetUser.versions ? [...targetUser.versions, newPrompt] : [targetUser.content, newPrompt];
+      const newVersionIdx = userVersions.length - 1;
+      msgs[userMsgIndex] = {
+        ...targetUser,
+        content: newPrompt,
+        versions: userVersions,
+        currentVersionIndex: newVersionIdx
+      };
+
+      // Update or create assistant message versions
+      if (targetAssistant && targetAssistant.role === 'assistant') {
+        const assistantVersions = targetAssistant.versions ? [...targetAssistant.versions, ''] : [targetAssistant.content, ''];
+        msgs[userMsgIndex + 1] = {
+          ...targetAssistant,
+          content: '',
+          versions: assistantVersions,
+          currentVersionIndex: newVersionIdx
+        };
+      } else {
+        msgs.splice(userMsgIndex + 1, 0, {
+          id: newAssistantMsgId || 'msg-' + Date.now(),
+          role: 'assistant',
+          content: '',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          versions: [''],
+          currentVersionIndex: 0
+        });
+      }
+
+      // Truncate any messages that came after this turn in the old branch
+      const truncated = msgs.slice(0, userMsgIndex + 2);
+      return { ...state, chatMessages: truncated };
+    }
+    case 'SWITCH_CHAT_VERSION': {
+      const { userMsgIndex, targetVersionIndex } = action.payload;
+      const msgs = [...state.chatMessages];
+      const targetUser = msgs[userMsgIndex];
+      const targetAssistant = msgs[userMsgIndex + 1];
+
+      if (targetUser && targetUser.versions && targetUser.versions[targetVersionIndex] !== undefined) {
+        msgs[userMsgIndex] = {
+          ...targetUser,
+          content: targetUser.versions[targetVersionIndex],
+          currentVersionIndex: targetVersionIndex
+        };
+      }
+      if (targetAssistant && targetAssistant.versions && targetAssistant.versions[targetVersionIndex] !== undefined) {
+        msgs[userMsgIndex + 1] = {
+          ...targetAssistant,
+          content: targetAssistant.versions[targetVersionIndex],
+          currentVersionIndex: targetVersionIndex
+        };
+      }
+      return { ...state, chatMessages: msgs };
+    }
     case 'UPDATE_LAST_CHAT_MESSAGE': {
       if (state.chatMessages.length === 0) return state;
       const newMsgs = [...state.chatMessages];
       const lastIdx = newMsgs.length - 1;
-      newMsgs[lastIdx] = { ...newMsgs[lastIdx], content: action.payload };
+      const current = newMsgs[lastIdx];
+      let updatedVersions = current.versions;
+      if (updatedVersions && updatedVersions.length > 0) {
+        const vIdx = current.currentVersionIndex !== undefined ? current.currentVersionIndex : updatedVersions.length - 1;
+        updatedVersions = [...updatedVersions];
+        updatedVersions[vIdx] = action.payload;
+      }
+      newMsgs[lastIdx] = { 
+        ...current, 
+        content: action.payload,
+        versions: updatedVersions || [action.payload],
+        currentVersionIndex: current.currentVersionIndex !== undefined ? current.currentVersionIndex : 0
+      };
       return { ...state, chatMessages: newMsgs };
     }
     case 'CLEAR_CHAT':
@@ -117,10 +198,11 @@ export function AppProvider({ children }) {
     localStorage.setItem('netsage_theme', state.theme);
   }, [state.theme]);
 
-  // Live Poller
+    // Live Poller & PT Listener Sync
   useEffect(() => {
     const poll = async () => {
       try {
+        // 1. Live Packet Tracer buffer sync
         const res = await fetch('/api/live');
         if (!res.ok) {
           dispatch({ type: 'SET_BACKEND_CONNECTED', payload: false });
@@ -128,19 +210,29 @@ export function AppProvider({ children }) {
         }
         dispatch({ type: 'SET_BACKEND_CONNECTED', payload: true });
         const text = await res.text();
-        if (!text) return;
-        const data = JSON.parse(text);
-        if (data.exists && data.is_fresh) {
-          dispatch({ type: 'SET_LIVE_STATUS', payload: { active: true, text: 'Live Sync' } });
-          dispatch({ type: 'SET_CLI_INPUT', payload: data.content });
-        } else {
-          dispatch({ type: 'SET_LIVE_STATUS', payload: { active: false, text: 'Standby' } });
+        if (text) {
+          try {
+            const data = JSON.parse(text);
+            if (data.exists && data.is_fresh) {
+              dispatch({ type: 'SET_LIVE_STATUS', payload: { active: true, text: 'Live Sync' } });
+              dispatch({ type: 'SET_CLI_INPUT', payload: data.content });
+            } else {
+              dispatch({ type: 'SET_LIVE_STATUS', payload: { active: false, text: 'Standby' } });
+            }
+          } catch(e) {}
+        }
+
+        // 2. Global PT Listener process sync
+        const lRes = await fetch('/api/listener/status');
+        if (lRes.ok) {
+          const lData = await lRes.json();
+          dispatch({ type: 'SET_LISTENER_RUNNING', payload: !!lData.running });
         }
       } catch (e) {
         dispatch({ type: 'SET_BACKEND_CONNECTED', payload: false });
       }
     };
-    const interval = setInterval(poll, 1500);
+    const interval = setInterval(poll, 2500);
     poll();
     return () => clearInterval(interval);
   }, []);

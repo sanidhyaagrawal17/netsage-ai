@@ -1,3 +1,11 @@
+from __future__ import annotations
+
+def get_optimal_threads() -> int:
+    """Calculate strict optimal CPU thread count (max 2 threads) to prevent system freeze."""
+    total_cores = os.cpu_count() or 4
+    # Strictly cap at 2 threads maximum to prioritize OS stability
+    return max(1, min(2, total_cores // 2))
+
 """NetSage AI - Local Small Language Model (SLM) Inference & Telemetry Engine (Phase 2).
 
 Provides communication with local Ollama instances (e.g. qwen2.5-coder:3b,
@@ -5,7 +13,6 @@ llama3.2:3b), prompt assembly, strict JSON parsing, native execution telemetry
 instrumentation (RQ2), system memory profiling, and responsible AI audit logging.
 """
 
-from __future__ import annotations
 
 import csv
 import datetime
@@ -178,10 +185,12 @@ def query_local_slm_stream(
         "prompt": full_prompt,
         "stream": True,
         "format": "json",
+        "keep_alive": "30m",
         "options": {
             "temperature": 0.1,
             "top_p": 0.9,
-            "num_ctx": 8192,
+            "num_ctx": 2048,
+            "num_thread": get_optimal_threads(),
         },
     }
 
@@ -399,7 +408,8 @@ def chat_slm_stream(
         "   ```\n"
         "3. Use bullet points for sequential steps and key explanations.\n"
         "4. Wrap inline command names, IP addresses, VLAN IDs, and interface names in single backticks (e.g. `show ip int brief`, `VLAN 10`, `192.168.1.1`).\n"
-        "5. Keep the explanation concise, pedagogical, and actionable."
+        "5. Keep the explanation concise, pedagogical, and actionable.\n"
+        "6. If the user asks how to upload, map, or discover the network topology, give this EXACT advice: \"You don't need to upload an image! Just follow these steps:\n1. In Packet Tracer, run `show cdp neighbors`.\n2. Copy the output and paste it into the main Terminal Input box in NetSage AI.\n3. Click the **Discover Topology** button (located right above the main terminal input, next to the (i) icon).\nThe system will automatically map your topology and save it as active context!\""
     )
     
     prompt_parts = [f"System: {system_instruction}"]
@@ -418,10 +428,12 @@ def chat_slm_stream(
         "model": model_name,
         "prompt": full_prompt,
         "stream": True,
+        "keep_alive": "30m",
         "options": {
             "temperature": 0.3,
             "top_p": 0.9,
-            "num_ctx": 4096,
+            "num_ctx": 2048,
+            "num_thread": get_optimal_threads(),
         },
     }
     
@@ -468,14 +480,12 @@ def chat_slm_stream(
                 "- Apply the suggested remediation commands."
             )
         else:
-            ctx_summary = (context[:180] + '...') if context else 'General Cisco IOS Troubleshooting'
             fallback = (
-                f"**NetSage Copilot Assessment:**\n\n"
-                f"Here is the recommended troubleshooting flow for your active scenario:\n\n"
-                f"1. **Interface Layer:** Confirm physical and protocol status (`show ip int brief`).\n"
-                f"2. **Forwarding Plane:** Inspect ARP and MAC tables (`show ip arp`, `show mac address-table`).\n"
-                f"3. **Routing & Policies:** Verify next-hop reachability and active ACLs.\n\n"
-                f"*Context:* {ctx_summary}"
+                "⚠️ *Ollama is currently offline — this is a pre-built response, not a live AI diagnosis.*\n\n"
+                "**General Troubleshooting Flow:**\n\n"
+                "1. **Interface Layer:** Confirm physical and protocol status (`show ip int brief`).\n"
+                "2. **Forwarding Plane:** Inspect ARP and MAC tables (`show ip arp`, `show mac address-table`).\n"
+                "3. **Routing & Policies:** Verify next-hop reachability and active ACLs."
             )
         
         for chunk in fallback.split(' '):
