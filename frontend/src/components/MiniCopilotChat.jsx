@@ -219,6 +219,10 @@ export default function MiniCopilotChat({ isPiP = false }) {
 
   const handleSaveEdit = (idx) => {
     if (!editText.trim()) return;
+    if (editText.trim() === messages[idx].content.trim()) {
+      setEditingIndex(null);
+      return;
+    }
     setEditingIndex(null);
     sendMessage(editText.trim(), true, idx);
   };
@@ -311,15 +315,24 @@ export default function MiniCopilotChat({ isPiP = false }) {
                     <ChatMessageContent content={msg.content} isUser={isUser} />
                   </div>
 
-                  {/* Edit Pencil on Hover for User Messages */}
-                  {isUser && !isStreaming && (
-                    <button
-                      onClick={() => handleStartEdit(index, msg.content)}
-                      className="absolute -left-6 top-1/2 -translate-y-1/2 opacity-0 group-hover/bubble:opacity-100 transition-opacity p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-white"
-                      title="Edit prompt and branch response"
-                    >
-                      <Edit2 size={11} />
-                    </button>
+                  {/* Action Buttons on Hover for User Messages */}
+                  {isUser && (
+                    <div className="absolute -left-12 top-1/2 -translate-y-1/2 opacity-0 group-hover/bubble:opacity-100 transition-opacity flex items-center gap-1">
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(msg.content); toast.success('Prompt copied'); }}
+                        className="p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-white"
+                        title="Copy prompt"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                      </button>
+                      <button
+                        onClick={() => handleStartEdit(index, msg.content)}
+                        className="p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-white"
+                        title="Edit prompt and branch response"
+                      >
+                        <Edit2 size={11} />
+                      </button>
+                    </div>
                   )}
                 </div>
               )}
@@ -367,14 +380,6 @@ export default function MiniCopilotChat({ isPiP = false }) {
               )}
             </div>
 
-            {/* Inline Stop Button */}
-            <button
-              onClick={stopGeneration}
-              className="flex items-center gap-1 px-2 py-0.5 rounded bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-[10px] font-medium transition-colors"
-            >
-              <Square size={9} className="fill-current" />
-              <span>Stop</span>
-            </button>
           </div>
         )}
 
@@ -426,14 +431,13 @@ export default function MiniCopilotChat({ isPiP = false }) {
             style={{ maxHeight: '150px' }}
           />
           {isStreaming ? (
-            <Button 
-              size="icon" 
-              onClick={stopGeneration}
-              className="h-6 w-6 rounded-lg bg-red-600 hover:bg-red-500 text-white flex-shrink-0 shadow-sm"
-              title="Stop Generation"
-            >
-              <Square size={10} className="fill-current" />
-            </Button>
+            <button 
+                onClick={stopGeneration}
+                title="Stop Generating"
+                className="h-6 w-6 flex items-center justify-center rounded-full bg-foreground hover:bg-foreground/80 text-background flex-shrink-0 mb-0.5 transition-all shadow-sm group"
+              >
+                <Square size={9} className="fill-current group-hover:scale-90 transition-transform" />
+              </button>
           ) : (
             <Button 
               size="icon" 

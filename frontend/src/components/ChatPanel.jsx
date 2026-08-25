@@ -12,6 +12,8 @@ export default function ChatPanel() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
+  const [editingIndex, setEditingIndex] = useState(null);
+  const [editText, setEditText] = useState('');
   const [width, setWidth] = useState(() => {
     try {
       const saved = localStorage.getItem('netsage_copilot_width');
@@ -265,6 +267,10 @@ export default function ChatPanel() {
 
   const handleSaveEdit = (idx) => {
     if (!editText.trim()) return;
+    if (editText.trim() === messages[idx].content.trim()) {
+      setEditingIndex(null);
+      return;
+    }
     setEditingIndex(null);
     sendMessage(editText.trim(), true, idx);
   };
@@ -388,25 +394,100 @@ export default function ChatPanel() {
             )}
 
             {/* Messages */}
-            {messages.map((msg) => {
+            {messages.map((msg, index) => {
               const isUser = msg.role === 'user';
+              const isEditing = editingIndex === index;
+              const hasMultipleVersions = msg.versions && msg.versions.length > 1;
+              const currentVIdx = msg.currentVersionIndex || 0;
+              const versions = msg.versions || [];
+
               return (
                 <div 
                   key={msg.id} 
-                  className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} space-y-1`}
+                  className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} space-y-1 group/bubble relative`}
                 >
-                  <div 
-                    className={cn(
-                      "p-3.5 rounded-2xl text-xs leading-relaxed break-words transition-all",
-                      isUser 
-                        ? 'bg-blue-600 text-white rounded-br-none shadow-md shadow-blue-600/20 max-w-[85%]' 
-                        : 'bg-muted/40 text-foreground border border-border/80 rounded-bl-none shadow-sm',
-                      isMaximized && !isUser ? 'max-w-full w-full' : 'max-w-[92%]'
+                  {isEditing ? (
+                    <div className="flex flex-col gap-2 w-full max-w-[85%] animate-fadeIn">
+                      <textarea
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-lg p-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-blue-500/50 resize-none min-h-[60px] scrollbar-mini"
+                        autoFocus
+                      />
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={handleCancelEdit}
+                          className="h-6 px-2 text-[10px] text-muted-foreground hover:text-white"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleSaveEdit(index)}
+                          className="h-6 px-2.5 text-[10px] bg-blue-600 hover:bg-blue-500 text-white font-medium shadow-sm"
+                        >
+                          Save & Branch
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div 
+                      className={cn(
+                        "relative p-3.5 rounded-2xl text-xs leading-relaxed break-words transition-all",
+                        isUser 
+                          ? 'bg-blue-600 text-white rounded-br-none shadow-md shadow-blue-600/20 max-w-[85%]' 
+                          : 'bg-muted/40 text-foreground border border-border/80 rounded-bl-none shadow-sm',
+                        isMaximized && !isUser ? 'max-w-full w-full' : 'max-w-[92%]'
+                      )}
+                    >
+                      <ChatMessageContent content={msg.content} isUser={isUser} />
+                      
+                      {/* Action Buttons on Hover for User Messages */}
+                      {isUser && (
+                        <div className="absolute -left-12 top-1/2 -translate-y-1/2 opacity-0 group-hover/bubble:opacity-100 transition-opacity flex items-center gap-1">
+                          <button
+                            onClick={() => { navigator.clipboard.writeText(msg.content); toast.success('Prompt copied'); }}
+                            className="p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-white"
+                            title="Copy prompt"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                          </button>
+                          <button
+                            onClick={() => handleStartEdit(index, msg.content)}
+                            className="p-1 rounded hover:bg-white/10 text-muted-foreground hover:text-white"
+                            title="Edit prompt and branch response"
+                          >
+                            <Edit2 size={11} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center gap-2 px-1 text-[9px] text-zinc-500 font-mono">
+                    {isUser && hasMultipleVersions && !isEditing && (
+                      <div className="flex items-center gap-1 bg-white/[0.04] border border-white/[0.08] px-1.5 py-0.5 rounded-md">
+                        <button
+                          disabled={currentVIdx === 0 || isStreaming}
+                          onClick={() => switchVersion(index, currentVIdx - 1)}
+                          className="hover:text-white disabled:opacity-30 disabled:hover:text-zinc-500"
+                        >
+                          <ChevronLeft size={10} />
+                        </button>
+                        <span>{currentVIdx + 1}/{versions.length}</span>
+                        <button
+                          disabled={currentVIdx === versions.length - 1 || isStreaming}
+                          onClick={() => switchVersion(index, currentVIdx + 1)}
+                          className="hover:text-white disabled:opacity-30 disabled:hover:text-zinc-500"
+                        >
+                          <ChevronRight size={10} />
+                        </button>
+                      </div>
                     )}
-                  >
-                    <ChatMessageContent content={msg.content} isUser={isUser} />
+                    <span>{msg.timestamp}</span>
                   </div>
-                  <span className="text-[9px] text-zinc-500 px-1 font-mono">{msg.timestamp}</span>
                 </div>
               );
             })}
@@ -417,7 +498,7 @@ export default function ChatPanel() {
                   {state.aiStatus === 'thinking' ? (
                     <>
                       <Brain size={13} className="text-amber-400 animate-pulse" />
-                      <span className="text-xs text-amber-400 font-medium">Reasoning...</span>
+                      <span className="text-xs text-amber-400 font-medium">Reasoning (Model may be warming up)...</span>
                     </>
                   ) : (
                     <>
@@ -427,14 +508,7 @@ export default function ChatPanel() {
                   )}
                 </div>
 
-                {/* Inline Stop Button */}
-                <button
-                  onClick={stopGeneration}
-                  className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 text-xs font-medium transition-colors"
-                >
-                  <Square size={10} className="fill-current" />
-                  <span>Stop</span>
-                </button>
+
               </div>
             )}
 
@@ -482,14 +556,24 @@ export default function ChatPanel() {
               className="w-full text-xs bg-transparent px-2.5 py-1.5 text-foreground placeholder:text-muted-foreground focus:outline-none resize-none overflow-y-auto h-[34px] min-h-[34px] scrollbar-none leading-relaxed" 
               style={{ maxHeight: '180px' }}
             />
-            <Button 
-              size="icon" 
-              disabled={isStreaming || !inputMessage.trim()}
-              className="h-7 w-7 rounded-lg bg-blue-600 hover:bg-blue-500 text-white flex-shrink-0 disabled:opacity-40 shadow-sm mb-0.5" 
-              onClick={() => sendMessage()}
-            >
-              <Send size={12} />
-            </Button>
+            {isStreaming ? (
+              <button 
+                  onClick={stopGeneration}
+                  title="Stop Generating"
+                  className="h-7 w-7 flex items-center justify-center rounded-full bg-foreground hover:bg-foreground/80 text-background flex-shrink-0 mb-0.5 transition-all shadow-sm group"
+                >
+                  <Square size={10} className="fill-current group-hover:scale-90 transition-transform" />
+                </button>
+            ) : (
+              <Button 
+                size="icon" 
+                disabled={!inputMessage.trim()}
+                className="h-7 w-7 rounded-lg bg-blue-600 hover:bg-blue-500 text-white flex-shrink-0 disabled:opacity-40 shadow-sm mb-0.5" 
+                onClick={() => sendMessage()}
+              >
+                <Send size={12} />
+              </Button>
+            )}
           </div>
         </div>
       </motion.aside>

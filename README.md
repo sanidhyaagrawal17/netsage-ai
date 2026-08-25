@@ -41,6 +41,9 @@ NetSage AI is an intelligent, dual-stage network diagnostic copilot engineered f
   - **Document Picture-in-Picture (PiP)**: Detached OS-level always-on-top window enabling live diagnosis while working inside Cisco Packet Tracer.
   - **Collapsible Sidebar Rail**: Collapses to an Apple-style icon rail with hover tooltips and sliding active spring animations (`motion/react`).
   - **Interactive NetSage Copilot**: Expandable assistant drawer with quick diagnostic prompts.
+  - **Dynamic Timeline Branching**: Edit any past prompt and branch conversations without losing context.
+  - **Automated Topology Discovery**: Parses `show cdp neighbors` to dynamically infer network graphs.
+  - **Stealth Model Pre-Warming**: Background thread pre-loads SLM models silently to ensure sub-second first-token latency.
   - **Live Cisco Terminal Input**: Built-in line numbers, copy/paste shortcuts, and real-time buffer capture indicators.
 
 - **📡 Track A: Real-Time Clipboard Listener (`pt_listener.py`)**

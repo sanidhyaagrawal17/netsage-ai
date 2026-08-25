@@ -36,7 +36,7 @@ function CodeBlock({ language, value }) {
             {language || 'cisco ios'}
           </span>
         </div>
-        {!isGenerating && (
+        {true && (
           <Button
             variant="ghost"
             size="sm"
@@ -65,6 +65,59 @@ function CodeBlock({ language, value }) {
     </div>
   );
 }
+
+const markdownPlugins = [remarkGfm];
+
+const markdownComponents = {
+  h1: ({ node, ...props }) => (
+    <h1 className="text-sm font-bold text-foreground mt-2 mb-1 tracking-tight border-b border-border/40 pb-1" {...props} />
+  ),
+  h2: ({ node, ...props }) => (
+    <h2 className="text-xs font-bold text-blue-400 mt-3 mb-1 tracking-tight flex items-center gap-1.5" {...props} />
+  ),
+  h3: ({ node, ...props }) => (
+    <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mt-2.5 mb-1" {...props} />
+  ),
+  p: ({ node, ...props }) => (
+    <p className="my-1.5 leading-relaxed text-zinc-300 last:mb-0" {...props} />
+  ),
+  strong: ({ node, ...props }) => (
+    <strong className="font-semibold text-white" {...props} />
+  ),
+  em: ({ node, ...props }) => (
+    <em className="text-zinc-400 italic" {...props} />
+  ),
+  ul: ({ node, ...props }) => (
+    <ul className="list-disc pl-5 space-y-2.5 my-3 text-zinc-200 marker:text-zinc-500" {...props} />
+  ),
+  ol: ({ node, ...props }) => (
+    <ol className="list-decimal pl-5 space-y-2.5 my-3 text-zinc-200 marker:text-zinc-500" {...props} />
+  ),
+  li: ({ node, ...props }) => (
+    <li className="leading-relaxed pl-1.5" {...props} />
+  ),
+  blockquote: ({ node, ...props }) => (
+    <blockquote className="border-l-2 border-blue-500/50 pl-3 my-2 text-zinc-400 italic bg-blue-500/[0.04] py-1 rounded-r-lg" {...props} />
+  ),
+  code({ node, inline, className, children, ...props }) {
+    const match = /language-(\w+)/.exec(className || '');
+    const language = match ? match[1] : '';
+    const codeString = String(children).replace(/\n$/, '');
+
+    if (!inline && (codeString.includes('\n') || language)) {
+      return <CodeBlock language={language || 'cisco'} value={codeString} />;
+    }
+
+    return (
+      <code
+        className="px-1.5 py-0.5 rounded text-[11px] font-mono text-sky-300 bg-white/[0.08] border border-white/[0.08] mx-0.5"
+        {...props}
+      >
+        {children}
+      </code>
+    );
+  },
+};
 
 const ChatMessageContent = React.memo(function ChatMessageContent({ content, isUser }) {
   if (isUser) {
@@ -122,57 +175,8 @@ const ChatMessageContent = React.memo(function ChatMessageContent({ content, isU
       })}
 
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        components={{
-          h1: ({ node, ...props }) => (
-            <h1 className="text-sm font-bold text-foreground mt-2 mb-1 tracking-tight border-b border-border/40 pb-1" {...props} />
-          ),
-          h2: ({ node, ...props }) => (
-            <h2 className="text-xs font-bold text-blue-400 mt-3 mb-1 tracking-tight flex items-center gap-1.5" {...props} />
-          ),
-          h3: ({ node, ...props }) => (
-            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground mt-2.5 mb-1" {...props} />
-          ),
-          p: ({ node, ...props }) => (
-            <p className="my-1.5 leading-relaxed text-zinc-300 last:mb-0" {...props} />
-          ),
-          strong: ({ node, ...props }) => (
-            <strong className="font-semibold text-white" {...props} />
-          ),
-          em: ({ node, ...props }) => (
-            <em className="text-zinc-400 italic" {...props} />
-          ),
-          ul: ({ node, ...props }) => (
-            <ul className="list-disc pl-5 space-y-2.5 my-3 text-zinc-200 marker:text-zinc-500" {...props} />
-          ),
-          ol: ({ node, ...props }) => (
-            <ol className="list-decimal pl-5 space-y-2.5 my-3 text-zinc-200 marker:text-zinc-500" {...props} />
-          ),
-          li: ({ node, ...props }) => (
-            <li className="leading-relaxed pl-1.5" {...props} />
-          ),
-          blockquote: ({ node, ...props }) => (
-            <blockquote className="border-l-2 border-blue-500/50 pl-3 my-2 text-zinc-400 italic bg-blue-500/[0.04] py-1 rounded-r-lg" {...props} />
-          ),
-          code({ node, inline, className, children, ...props }) {
-            const match = /language-(\w+)/.exec(className || '');
-            const language = match ? match[1] : '';
-            const codeString = String(children).replace(/\n$/, '');
-
-            if (!inline && (codeString.includes('\n') || language)) {
-              return <CodeBlock language={language || 'cisco'} value={codeString} />;
-            }
-
-            return (
-              <code
-                className="px-1.5 py-0.5 rounded text-[11px] font-mono text-sky-300 bg-white/[0.08] border border-white/[0.08] mx-0.5"
-                {...props}
-              >
-                {children}
-              </code>
-            );
-          },
-        }}
+        remarkPlugins={markdownPlugins}
+        components={markdownComponents}
       >
         {processedContent}
       </ReactMarkdown>

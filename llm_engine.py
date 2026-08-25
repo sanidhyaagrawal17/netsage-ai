@@ -408,7 +408,7 @@ def chat_slm_stream(
         "   ```\n"
         "3. Use bullet points for sequential steps and key explanations.\n"
         "4. Wrap inline command names, IP addresses, VLAN IDs, and interface names in single backticks (e.g. `show ip int brief`, `VLAN 10`, `192.168.1.1`).\n"
-        "5. Keep the explanation concise, pedagogical, and actionable.\n"
+        "5. Be highly detailed and comprehensive in your explanations, but remain pedagogical and actionable. Deeply explain concepts when requested.\n"
         "6. If the user asks how to upload, map, or discover the network topology, give this EXACT advice: \"You don't need to upload an image! Just follow these steps:\n1. In Packet Tracer, run `show cdp neighbors`.\n2. Copy the output and paste it into the main Terminal Input box in NetSage AI.\n3. Click the **Discover Topology** button (located right above the main terminal input, next to the (i) icon).\nThe system will automatically map your topology and save it as active context!\""
     )
     
