@@ -180,3 +180,28 @@
 .scrollbar-mini::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.45) !important;
 }
+
+/* PiP Window specific overrides */
+.pip-window-body {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+}
+.pip-window-body::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.pip-window-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.pip-window-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+}
+.pip-window-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}

@@ -59,7 +59,7 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 
 
 def _prewarm_ollama_model():
-    """Stealth pre-warm: Wait 20 seconds so startup is fast, then use 1 thread to quietly load model to RAM."""
+    """Background pre-warm: Wait 20 seconds so startup is fast, then use 1 thread to quietly load model to RAM."""
     import time
     time.sleep(20.0)  # Wait for system to settle
     try:
@@ -77,7 +77,7 @@ def _prewarm_ollama_model():
             }
         }
         requests.post(url, json=payload, timeout=30.0)
-        print("Ollama model pre-warmed into RAM (Stealth Mode).", flush=True)
+        print("Ollama model pre-warmed into RAM (background pre-warm complete).", flush=True)
     except Exception as exc:
         print(f"Ollama pre-warm notice: {exc}", flush=True)
 
@@ -315,6 +315,18 @@ def submit_review(req: ReviewRequest):
     return {"status": "success", "message": f"Case {req.case_id} logged successfully."}
 
 
+@app.get("/api/audit")
+def get_audit_logs():
+    """Return responsible AI audit data."""
+    if not RESPONSIBLE_LOG_FILE.exists():
+        return {"exists": False, "records": []}
+    df = pd.read_csv(RESPONSIBLE_LOG_FILE)
+    df = df.fillna("")
+    return {
+        "exists": True,
+        "records": df.to_dict(orient="records")
+    }
+
 @app.get("/api/benchmarks")
 def get_benchmarks():
     """Return empirical benchmark data."""
@@ -362,7 +374,6 @@ def toggle_listener():
         return {"status": "error", "running": False, "detail": str(e)}
 
 
-@app.post("/api/listener/start")
 def start_listener():
     global _listener_proc
     if _listener_proc and _listener_proc.poll() is None:
@@ -377,7 +388,6 @@ def start_listener():
     except Exception as e:
         return {"status": "error", "detail": str(e)}
 
-@app.post("/api/listener/stop")
 def stop_listener():
     global _listener_proc
     if _listener_proc and _listener_proc.poll() is None:

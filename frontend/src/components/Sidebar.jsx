@@ -50,7 +50,6 @@ export default function Sidebar() {
   const navItems = [
     { id: 'tab-input', label: 'Terminal', icon: Terminal, badge: 'Live' },
     { id: 'tab-diagnosis', label: 'Diagnosis', icon: Activity },
-    { id: 'tab-telemetry', label: 'Telemetry', icon: Wifi },
     { id: 'tab-history', label: 'History', icon: History, badge: state.diagnosisHistory?.length > 0 ? String(state.diagnosisHistory.length) : null },
     { id: 'tab-audit', label: 'AI Safety', icon: ShieldCheck },
   ];

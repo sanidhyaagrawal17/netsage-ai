@@ -144,50 +144,7 @@ export default function FloatingStatus() {
       });
 
       // 4. Injected PiP base & scroll styles
-      const pipBaseStyle = pipDoc.createElement('style');
-      pipBaseStyle.textContent = `
-        *, *::before, *::after { box-sizing: border-box; }
-        html, body {
-          width: 100vw;
-          height: 100%;
-          margin: 0;
-          padding: 0;
-          overflow: hidden;
-          background: #09090b !important;
-          color: #f4f4f5 !important;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Inter, sans-serif;
-          -webkit-font-smoothing: antialiased;
-        }
-                .scrollbar-mini {
-          scrollbar-width: thin !important;
-          scrollbar-color: rgba(255, 255, 255, 0.3) transparent !important;
-        }
-        .scrollbar-mini::-webkit-scrollbar {
-          width: 5px !important;
-          height: 5px !important;
-          display: block !important;
-        }
-        .scrollbar-mini::-webkit-scrollbar-track {
-          background: transparent !important;
-        }
-        .scrollbar-mini::-webkit-scrollbar-thumb {
-          background: rgba(255, 255, 255, 0.3) !important;
-          border-radius: 9999px !important;
-        }
-        .scrollbar-mini::-webkit-scrollbar-thumb:hover {
-          background: rgba(255, 255, 255, 0.5) !important;
-        }
-        #pip-root {
-          width: 100vw;
-          height: 100%;
-          max-height: 100%;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-          background: #09090b;
-        }
-      `;
-      pipDoc.head.appendChild(pipBaseStyle);
+      
 
       // Create root container
       const container = pipDoc.createElement('div');
@@ -283,7 +240,7 @@ export default function FloatingStatus() {
       <div 
         id="floating-status-widget"
         className={cn(
-          "fixed top-0 left-0 z-50 select-none",
+          "fixed top-0 left-0 z-50",
           isDragging ? "cursor-grabbing" : "transition-transform duration-150 ease-out"
         )}
         style={{ 

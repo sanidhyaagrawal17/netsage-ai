@@ -40,3 +40,6 @@ responsible_ai_log.csv
 .pytest_cache/
 .coverage
 htmlcov/
+start.bat
+
+archive/

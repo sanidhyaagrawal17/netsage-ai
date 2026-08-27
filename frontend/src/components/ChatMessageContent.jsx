@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Copy, Check, Terminal, Code2, Bot, Brain, Loader2, Sparkles, ChevronDown, ChevronRight } from 'lucide-react';
@@ -150,7 +150,7 @@ const ChatMessageContent = React.memo(function ChatMessageContent({ content, isU
             <summary className="cursor-pointer flex items-center justify-between px-2.5 py-1.5 text-[11px] font-mono text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors select-none">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-muted-foreground/60 transition-transform group-open:rotate-90">
-                  ▶
+                  â–¶
                 </span>
                 <span className="flex items-center gap-1.5 font-medium">
                   {isCurrentThoughtActive ? (
@@ -185,3 +185,4 @@ const ChatMessageContent = React.memo(function ChatMessageContent({ content, isU
 });
 
 export default ChatMessageContent;
+

@@ -310,7 +310,7 @@ export default function ChatPanel() {
         transition={isResizing ? { duration: 0 } : { type: "spring", stiffness: 350, damping: 30 }}
         style={{ width: currentWidthStyle }}
         className={cn(
-          "relative border-l border-border bg-card flex flex-col h-screen select-none flex-shrink-0 transition-colors duration-200 shadow-2xl",
+          "relative border-l border-border bg-card flex flex-col h-screen flex-shrink-0 transition-colors duration-200 shadow-2xl",
           isMaximized && "z-20",
           isResizing && "select-none cursor-col-resize"
         )}
@@ -498,7 +498,7 @@ export default function ChatPanel() {
                   {state.aiStatus === 'thinking' ? (
                     <>
                       <Brain size={13} className="text-amber-400 animate-pulse" />
-                      <span className="text-xs text-amber-400 font-medium">Reasoning (Model may be warming up)...</span>
+                      <span className="text-xs text-amber-400 font-medium">Reasoning...</span>
                     </>
                   ) : (
                     <>

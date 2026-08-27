@@ -189,13 +189,13 @@ def query_local_slm_stream(
         "options": {
             "temperature": 0.1,
             "top_p": 0.9,
-            "num_ctx": 2048,
+            "num_ctx": 4096,
             "num_thread": get_optimal_threads(),
         },
     }
 
     try:
-        response = requests.post(endpoint, json=payload, stream=True, timeout=10.0)
+        response = requests.post(endpoint, json=payload, stream=True, timeout=120.0)
         response.raise_for_status()
         
         for line in response.iter_lines():
@@ -432,13 +432,13 @@ def chat_slm_stream(
         "options": {
             "temperature": 0.3,
             "top_p": 0.9,
-            "num_ctx": 2048,
+            "num_ctx": 4096,
             "num_thread": get_optimal_threads(),
         },
     }
     
     try:
-        response = requests.post(endpoint, json=payload, stream=True, timeout=10.0)
+        response = requests.post(endpoint, json=payload, stream=True, timeout=120.0)
         response.raise_for_status()
         for line in response.iter_lines():
             if line:
@@ -447,7 +447,7 @@ def chat_slm_stream(
                 if token:
                     yield token
     except Exception as exc:
-        logger.warning(f"Ollama chat streaming offline/fallback: {exc}")
+        logger.warning(f"Ollama chat streaming offline/fallback ({model_name} at {endpoint}): {exc}")
         msg_lower = message.lower()
         if "vlan" in msg_lower:
             fallback = (

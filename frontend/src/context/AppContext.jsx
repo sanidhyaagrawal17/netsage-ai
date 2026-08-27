@@ -232,7 +232,7 @@ export function AppProvider({ children }) {
         dispatch({ type: 'SET_BACKEND_CONNECTED', payload: false });
       }
     };
-    const interval = setInterval(poll, 2500);
+    const interval = setInterval(poll, 5000);
     poll();
     return () => clearInterval(interval);
   }, []);
