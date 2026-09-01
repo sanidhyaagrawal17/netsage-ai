@@ -11,6 +11,7 @@ export default function TerminalInput() {
   const [isDiagnosing, setIsDiagnosing] = useState(false);
   const listenerRunning = state.isListenerRunning;
   const [lineCount, setLineCount] = useState(1);
+  const [isOcrLoading, setIsOcrLoading] = useState(false);
   const [selectedText, setSelectedText] = useState('');
   const textareaRef = useRef(null);
   const lineNumbersRef = useRef(null);
@@ -24,6 +25,63 @@ export default function TerminalInput() {
   const handleScroll = () => {
     if (textareaRef.current && lineNumbersRef.current) {
       lineNumbersRef.current.scrollTop = textareaRef.current.scrollTop;
+    }
+  };
+
+  const handleDiscoverTopology = async () => {
+    if (!state.cliInput || !state.cliInput.trim()) {
+      toast.info("Paste 'show cdp neighbors' or an image screenshot (Ctrl+V) first!");
+      return;
+    }
+    setIsDiscoveringTopology(true);
+    try {
+      const res = await fetch('/api/topology/discover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cli_text: state.cliInput })
+      });
+      const data = await res.json();
+      if (data.status === 'success' && data.topology) {
+        dispatch({ type: 'SET_TOPOLOGY_NOTE', payload: data.topology });
+        toast.success('Topology mapped successfully into active context!');
+        dispatch({ 
+          type: 'SET_COPILOT_PROMPT', 
+          payload: "I just mapped a network topology. Please summarize the connected devices, subnets, and layers, and suggest a topology reference name." 
+        });
+      } else {
+        toast.info(data.message || "No CDP neighbor output detected in buffer. Paste 'show cdp neighbors' or a diagram screenshot (Ctrl+V).");
+      }
+    } catch (e) {
+      toast.error('Failed to discover topology from buffer');
+    } finally {
+      setIsDiscoveringTopology(false);
+    }
+  };
+
+  const handlePaste = async (e) => {
+    if (e.clipboardData.files && e.clipboardData.files.length > 0) {
+      const file = e.clipboardData.files[0];
+      if (file.type.startsWith('image/')) {
+        e.preventDefault();
+        setIsOcrLoading(true);
+        toast.info('Running OCR on pasted image...');
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+          const res = await fetch('/api/ocr', { method: 'POST', body: formData });
+          const json = await res.json();
+          if (json.success) {
+            dispatch({ type: 'SET_CLI_INPUT', payload: state.cliInput + (state.cliInput ? '\n' : '') + json.text });
+            toast.success('OCR Transcription Successful');
+          } else {
+            toast.error(json.text || 'OCR Failed');
+          }
+        } catch (err) {
+          toast.error('Network error during OCR');
+        } finally {
+          setIsOcrLoading(false);
+        }
+      }
     }
   };
 
@@ -253,6 +311,16 @@ export default function TerminalInput() {
               {listenerRunning ? <Wifi size={13} /> : <WifiOff size={13} />}
               {listenerRunning ? 'Listener Active' : 'Start Listener'}
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDiscoverTopology}
+              disabled={isDiscoveringTopology || state.isCopilotStreaming}
+              className="gap-2 rounded-xl text-xs h-8 hover:bg-emerald-600/20 text-emerald-500 border-emerald-500/30"
+            >
+              <Map size={13} />
+              {isDiscoveringTopology ? 'Mapping Topology...' : state.isCopilotStreaming ? 'Copilot Analyzing...' : 'Map Topology'}
+            </Button>
             {!state.isCopilotOpen && (
               <Button
                 variant="outline"
@@ -321,7 +389,8 @@ export default function TerminalInput() {
               onChange={(e) => dispatch({ type: 'SET_CLI_INPUT', payload: e.target.value })}
               onSelect={handleSelect}
               onScroll={handleScroll}
-              placeholder="Paste your Cisco IOS CLI output here, or start the PT Listener..."
+              onPaste={handlePaste}
+              placeholder={isOcrLoading ? "Extracting text from image via OCR..." : "Paste your Cisco IOS CLI output or an image screenshot here..."}
             />
           </div>
         </div>

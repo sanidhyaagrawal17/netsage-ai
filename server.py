@@ -21,7 +21,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from starlette.middleware.gzip import GZipMiddleware
 import threading
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,6 +31,8 @@ from pydantic import BaseModel
 
 # Local diagnostic engines
 from checker import run_all_checks, extract_relevant_context
+from pt_ipc_client import fetch_topology_via_ipc
+from ocr_engine import extract_text_from_image
 from llm_engine import log_telemetry_and_audit, query_local_slm, query_local_slm_stream, chat_slm_stream
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -90,13 +92,38 @@ def on_startup():
 class TopologyRequest(BaseModel):
     cli_text: str
 
+@app.post("/api/ocr")
+async def ocr_upload(file: UploadFile = File(...)):
+    """Extract text from uploaded screenshot (Fallback Option C)."""
+    contents = await file.read()
+    text = extract_text_from_image(contents)
+    if text.startswith("ERROR:"):
+        return {"success": False, "text": text}
+    return {"success": True, "text": text}
+
 @app.post("/api/topology/discover")
 async def discover_topology(req: TopologyRequest):
+    """
+    Discover and structure network topology from active CLI buffer or CDP output.
+    Note: Direct PTMP IPC Socket integration is designated for Future Scope / Roadmap.
+    """
     from checker import parse_cdp_neighbors
-    topology = parse_cdp_neighbors(req.cli_text)
-    if not topology:
-        return {"topology": "", "status": "not_found"}
-    return {"topology": topology, "status": "success"}
+    if req.cli_text:
+        # 1. Check for CDP neighbor output
+        topology = parse_cdp_neighbors(req.cli_text)
+        if topology:
+            return {"topology": topology, "status": "success"}
+            
+        # 2. Check for OCR extracted topology headers
+        if "# === DISCOVERED TOPOLOGY MAP ===" in req.cli_text or "Routers:" in req.cli_text:
+            return {"topology": req.cli_text.strip(), "status": "success"}
+            
+    return {
+        "topology": "",
+        "status": "no_data",
+        "message": "No CDP output found in terminal buffer. Paste 'show cdp neighbors' or a screenshot via Ctrl+V."
+    }
+
 
 def load_prompt_template() -> str:
     if not PROMPT_FILE.exists():
@@ -411,4 +438,4 @@ def serve_index():
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="127.0.0.1", port=8001)

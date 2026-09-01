@@ -1,4 +1,4 @@
-# Python & Environment
+﻿# Python & Virtual Environments
 __pycache__/
 *.py[cod]
 *$py.class
@@ -8,10 +8,13 @@ __pycache__/
 .venv/
 venv/
 ENV/
+env/
 *.log
 
-# Runtime CLI Buffers
+# Runtime CLI Buffers & User Logs
 live_cli_input.txt
+benchmark_paper_results.csv
+responsible_ai_log.csv
 
 # Streamlit Local Secrets
 .streamlit/secrets.toml
@@ -32,14 +35,15 @@ Thumbs.db
 *.swp
 *.swo
 
-# User logs and temp data
-benchmark_paper_results.csv
-responsible_ai_log.csv
+# Temporary Files, Binaries & Local Installers
 .tempmediaStorage/
-
 .pytest_cache/
 .coverage
 htmlcov/
-start.bat
-
 archive/
+tesseract/
+*.exe
+*.zip
+
+# Start script
+start.bat

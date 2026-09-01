@@ -9,6 +9,7 @@ import { cn } from '../lib/utils';
 export default function MiniCopilotChat({ isPiP = false }) {
   const { state, dispatch } = useAppContext();
   const [inputMessage, setInputMessage] = useState('');
+  const [isOcrLoading, setIsOcrLoading] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const textareaRef = useRef(null);
 
@@ -25,6 +26,15 @@ export default function MiniCopilotChat({ isPiP = false }) {
   }, [inputMessage]);
   const [editingIndex, setEditingIndex] = useState(null);
   const [editText, setEditText] = useState('');
+
+  
+  // Auto-trigger copilot from global state
+  useEffect(() => {
+    if (state.pendingCopilotPrompt && !isStreaming) {
+      handleSendMessage(state.pendingCopilotPrompt);
+      dispatch({ type: 'SET_COPILOT_PROMPT', payload: null });
+    }
+  }, [state.pendingCopilotPrompt, isStreaming]);
 
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -73,7 +83,7 @@ export default function MiniCopilotChat({ isPiP = false }) {
     if (!query || !query.trim() || isStreaming) return;
 
     if (!isBranch) {
-      setInputMessage('');
+      if (typeof overrideMsg !== 'string') setInputMessage('');
     }
     isAutoScrollEnabled.current = true;
 
@@ -412,7 +422,8 @@ export default function MiniCopilotChat({ isPiP = false }) {
         <div className="flex items-center gap-1.5 p-1 rounded-xl bg-background border border-border focus-within:border-primary/50 transition-colors shadow-inner">
           <textarea ref={textareaRef} 
             rows={1}
-            placeholder={isStreaming ? "Copilot is generating..." : "Ask Copilot..."} 
+            onPaste={handlePaste}
+            placeholder={isOcrLoading ? "Extracting text from image..." : isStreaming ? "Copilot is generating..." : "Ask Copilot or paste an image..."} 
             value={inputMessage}
             disabled={isStreaming}
             onChange={(e) => {
