@@ -1,0 +1,7 @@
+Stage,Details / Implementation Action
+Data Ingestion,Screenshot / Clipboard capture of Packet Tracer CLI or topology canvas (Ctrl + V).
+Vision Processing,Multi-Pass OCR Vision Engine (Tesseract 5.4+ with 2x Lanczos Super-Resolution).
+Deterministic Analysis,Deterministic Rule Engine (Python Regex & Subnet Parsing) flags hard Layer 2–7 errors.
+AI Inference,Background-Preloaded local LLM Diagnostic Engine (Ollama / Qwen2.5-Coder:3b) hypothesizes faults.
+Human Review (HITL),Mandatory Accept | Edit | Reject review workflow with Responsible AI Log recording.
+Evaluation & Dashboard,Final Metric & Evaluation Dashboard display with agreement rates & telemetry analytics.

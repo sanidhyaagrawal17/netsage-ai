@@ -1,0 +1,7 @@
+Weeks,Milestone / Implementation Deliverable
+Weeks 1–2,"Lab Modeling — Construct 30 diverse Packet Tracer scenarios (L2 switching, L3 routing, L4 security)."
+Weeks 3–4,"Data Extraction — CLI outputs, symptoms, topology notes, ground-truth root causes into cases.csv."
+Weeks 5–6,Engine Development — Python rule engine (checker.py) and structured LLM prompt templates.
+Weeks 7–8,System Integration — Connect prompt library to the local LLM via Ollama; run diagnostic passes on all 30 cases.
+Weeks 9–10,"Human Review & Audit — HITL tagging (Accepted / Edited / Rejected), compile the Responsible AI audit log."
+Weeks 11–12,"Dashboard & Demo — Finalize the React/Vite review UI and dashboard, record demo video, finalize documentation."
