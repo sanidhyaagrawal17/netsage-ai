@@ -1,22 +1,85 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
-import { Play, Bot, Trash2, Copy, Wifi, WifiOff, Clipboard, HelpCircle, Map, Info } from 'lucide-react';
+import { 
+  Play, Bot, Trash2, Copy, Wifi, WifiOff, Clipboard, HelpCircle, 
+  Map, Info, Camera, Sparkles, Check, ChevronDown, Layers, Terminal as TerminalIcon
+} from 'lucide-react';
 import { cn } from '../lib/utils';
-import { parseCiscoPrompt } from '../lib/ciscoParser';
+
+const PRESET_CASES = [
+  {
+    id: 'CASE-001',
+    name: 'Native VLAN Mismatch (Layer 2)',
+    layer: 'Data Link',
+    cli: `SW1# show interfaces status
+Port      Name               Status       Vlan       Duplex  Speed Type
+Gi0/1     Trunk_to_SW2       connected    trunk      a-full a-1000 1000BaseTX
+Gi0/2     Host-A_Access      connected    10         a-full  a-100 1000BaseTX
+
+SW1# show interfaces trunk
+Port        Mode             Encapsulation  Status        Native vlan
+Gi0/1       on               802.1q         trunking      1
+
+SW2# show interfaces trunk
+Port        Mode             Encapsulation  Status        Native vlan
+Gi0/1       on               802.1q         trunking      99
+
+SW1# show logging
+%CDP-4-NATIVE_VLAN_MISMATCH: Native VLAN mismatch discovered on GigabitEthernet0/1 (1), with SW2 GigabitEthernet0/1 (99).`
+  },
+  {
+    id: 'CASE-002',
+    name: 'Interface Administratively Down (Layer 1)',
+    layer: 'Physical',
+    cli: `Router1# show ip interface brief
+Interface              IP-Address      OK? Method Status                Protocol
+GigabitEthernet0/0     192.168.1.1     YES manual up                    up      
+GigabitEthernet0/1     10.0.0.1        YES manual administratively down down    
+Serial0/0/0            unassigned      YES unset  down                  down`
+  },
+  {
+    id: 'CASE-003',
+    name: 'OSPF Area ID Mismatch (Layer 3)',
+    layer: 'Network',
+    cli: `R1# show ip ospf interface brief
+Interface    PID   Area            IP Address/Mask    Cost  State Nbrs F/C
+Gi0/0        1     0               192.168.12.1/24    1     DR    0/0
+
+R2# show ip ospf interface brief
+Interface    PID   Area            IP Address/Mask    Cost  State Nbrs F/C
+Gi0/0        1     1               192.168.12.2/24    1     BDR   0/0
+
+R1# show ip ospf neighbor
+(Empty output - no OSPF neighbors established across 192.168.12.0/24)`
+  },
+  {
+    id: 'CASE-005',
+    name: 'Extended ACL Port 80 Block (Layer 4)',
+    layer: 'Transport',
+    cli: `Router1# show access-lists
+Extended IP access list 101
+    10 deny tcp any host 10.1.50.10 eq www (24 matches)
+    20 permit ip any any (112 matches)
+
+Router1# show ip interface GigabitEthernet0/1
+  Inbound access list is 101
+  Outgoing access list is not set`
+  }
+];
 
 export default function TerminalInput() {
   const { state, dispatch } = useAppContext();
   const [isDiagnosing, setIsDiagnosing] = useState(false);
+  const [isDiscoveringTopology, setIsDiscoveringTopology] = useState(false);
   const listenerRunning = state.isListenerRunning;
   const [lineCount, setLineCount] = useState(1);
   const [isOcrLoading, setIsOcrLoading] = useState(false);
-  const [selectedText, setSelectedText] = useState('');
+  const [selectedPreset, setSelectedPreset] = useState('');
   const textareaRef = useRef(null);
   const lineNumbersRef = useRef(null);
 
-  // Sync line numbers with textarea scroll
   useEffect(() => {
     const lines = (state.cliInput || '').split('\n').length;
     setLineCount(lines);
@@ -28,9 +91,19 @@ export default function TerminalInput() {
     }
   };
 
+  const handleSelectPreset = (e) => {
+    const caseId = e.target.value;
+    setSelectedPreset(caseId);
+    const found = PRESET_CASES.find(c => c.id === caseId);
+    if (found) {
+      dispatch({ type: 'SET_CLI_INPUT', payload: found.cli });
+      toast.success(`Loaded ${found.name}`);
+    }
+  };
+
   const handleDiscoverTopology = async () => {
     if (!state.cliInput || !state.cliInput.trim()) {
-      toast.info("Paste 'show cdp neighbors' or an image screenshot (Ctrl+V) first!");
+      toast.info("Paste 'show cdp neighbors' or a topology screenshot (Ctrl+V) first!");
       return;
     }
     setIsDiscoveringTopology(true);
@@ -43,16 +116,16 @@ export default function TerminalInput() {
       const data = await res.json();
       if (data.status === 'success' && data.topology) {
         dispatch({ type: 'SET_TOPOLOGY_NOTE', payload: data.topology });
-        toast.success('Topology mapped successfully into active context!');
+        toast.success('Topology mapped into active property graph!');
         dispatch({ 
           type: 'SET_COPILOT_PROMPT', 
           payload: "I just mapped a network topology. Please summarize the connected devices, subnets, and layers, and suggest a topology reference name." 
         });
       } else {
-        toast.info(data.message || "No CDP neighbor output detected in buffer. Paste 'show cdp neighbors' or a diagram screenshot (Ctrl+V).");
+        toast.info(data.message || "No CDP neighbor output detected. Paste 'show cdp neighbors' or a diagram screenshot.");
       }
     } catch (e) {
-      toast.error('Failed to discover topology from buffer');
+      toast.error('Failed to discover topology');
     } finally {
       setIsDiscoveringTopology(false);
     }
@@ -64,17 +137,17 @@ export default function TerminalInput() {
       if (file.type.startsWith('image/')) {
         e.preventDefault();
         setIsOcrLoading(true);
-        toast.info('Running OCR on pasted image...');
+        toast.info('Running multi-pass super-resolution OCR on pasted image...');
         const formData = new FormData();
         formData.append('file', file);
         try {
           const res = await fetch('/api/ocr', { method: 'POST', body: formData });
           const json = await res.json();
           if (json.success) {
-            dispatch({ type: 'SET_CLI_INPUT', payload: state.cliInput + (state.cliInput ? '\n' : '') + json.text });
-            toast.success('OCR Transcription Successful');
+            dispatch({ type: 'SET_CLI_INPUT', payload: (state.cliInput ? state.cliInput + '\n\n' : '') + json.text });
+            toast.success('Visual OCR Transcription Successful');
           } else {
-            toast.error(json.text || 'OCR Failed');
+            toast.error(json.text || 'OCR Extraction Failed');
           }
         } catch (err) {
           toast.error('Network error during OCR');
@@ -85,332 +158,236 @@ export default function TerminalInput() {
     }
   };
 
-  const handleSelect = (e) => {
-    const start = e.target.selectionStart;
-    const end = e.target.selectionEnd;
-    if (start !== end) {
-      const text = state.cliInput.substring(start, end).trim();
-      if (text.length > 5) {
-        setSelectedText(text);
-      } else {
-        setSelectedText('');
-      }
-    } else {
-      setSelectedText('');
-    }
-  };
-
-  const explainSelection = () => {
-    if (!selectedText) return;
-    dispatch({
-      type: 'SET_COPILOT_PROMPT',
-      payload: `Explain this Cisco CLI snippet in plain language for a networking student:\n\n\`\`\`cisco\n${selectedText}\n\`\`\``
-    });
-    toast.info("Sent snippet to NetSage Copilot");
-  };
-
-  const copyToClipboard = () => {
-    if (!state.cliInput) return;
-    navigator.clipboard.writeText(state.cliInput);
-    toast.success('CLI buffer copied to clipboard');
-  };
-
-  const pasteFromClipboard = async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      if (text) {
-        dispatch({ type: 'SET_CLI_INPUT', payload: text });
-        toast.success('Pasted from clipboard');
-      }
-    } catch (e) {
-      toast.error('Could not access clipboard');
-    }
-  };
-
-  const [isTogglingListener, setIsTogglingListener] = useState(false);
-  const toggleListener = async () => {
-    if (isTogglingListener) return;
-    setIsTogglingListener(true);
-    try {
-      const res = await fetch('/api/listener/toggle', { method: 'POST' });
-      const data = await res.json();
-      const isRunning = data.status === 'started' || !!data.running;
-      dispatch({ type: 'SET_LISTENER_RUNNING', payload: isRunning });
-      toast.success(isRunning ? 'Packet Tracer Clipboard Listener active' : 'Clipboard Listener stopped');
-    } catch (e) {
-      toast.error('Failed to toggle listener: ' + e.message);
-    } finally {
-      setIsTogglingListener(false);
-    }
-  };
-
-  const [isDiscoveringTopology, setIsDiscoveringTopology] = useState(false);
-
-  const discoverTopology = async () => {
-    if (!state.cliInput.trim()) {
-      toast.error('Paste "show cdp neighbors" output first!');
-      return;
-    }
-    setIsDiscoveringTopology(true);
-    try {
-      const res = await fetch('/api/topology/discover', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cli_text: state.cliInput })
-      });
-      const data = await res.json();
-      if (data.status === 'success' && data.topology) {
-        dispatch({ type: 'SET_TOPOLOGY_NOTE', payload: data.topology });
-        toast.success('Topology discovered successfully!');
-      } else {
-        toast.error('No CDP neighbors found in the input.');
-      }
-    } catch (e) {
-      toast.error('Failed to discover topology');
-    } finally {
-      setIsDiscoveringTopology(false);
-    }
-  };
-
   const handleDiagnose = async () => {
-    if (!state.cliInput || state.cliInput.trim().length === 0 || state.cliInput.startsWith('# Waiting')) {
-      toast.error('Please paste Cisco IOS CLI output first');
+    if (!state.cliInput || !state.cliInput.trim()) {
+      toast.error('CLI Buffer is empty. Paste Packet Tracer output or select a preset.');
       return;
     }
 
     setIsDiagnosing(true);
-    dispatch({ type: 'SET_AI_STATUS', payload: 'rules' });
-    dispatch({ type: 'SET_ACTIVE_VIEW', payload: 'tab-diagnosis' });
+    dispatch({ type: 'SET_AI_STATUS', payload: 'thinking' });
     dispatch({ type: 'SET_DIAGNOSIS', payload: null });
     dispatch({ type: 'SET_STREAMED_RAW', payload: '' });
-
-    const promptDetails = parseCiscoPrompt(state.cliInput);
+    dispatch({ type: 'SET_ACTIVE_VIEW', payload: 'tab-diagnosis' });
 
     try {
-      const res = await fetch('/api/diagnose/stream', {
+      const res = await fetch('/api/diagnose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          case_id: 'LIVE-PT-SESSION',
-          symptom: 'Capturing live network anomaly from your active Cisco Packet Tracer terminal...',
-          topology_note: `CLI Context: ${promptDetails.mode}\nLast Prompt: ${promptDetails.prompt}`,
+          case_id: selectedPreset || 'LIVE-PT-SESSION',
           show_outputs: state.cliInput,
-          osi_layer: 'Network',
-          model_name: state.currentModel,
-        }),
+          symptom: 'Network connectivity degraded or packet drop detected',
+          topology_note: state.topologyNote || '',
+          model_name: state.currentModel
+        })
       });
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-      let currentFindings = [];
-      let rawJson = '';
-      let doneReading = false;
+      if (!res.ok) throw new Error('Diagnosis server returned error');
+      const data = await res.json();
+      dispatch({ type: 'SET_DIAGNOSIS', payload: data });
+      dispatch({ type: 'SET_AI_STATUS', payload: 'idle' });
 
-      while (!doneReading) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n');
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const dataStr = line.slice(6);
-            if (!dataStr) continue;
-            try {
-              const event = JSON.parse(dataStr);
-              if (event.type === 'findings') {
-                currentFindings = event.data;
-                dispatch({ type: 'SET_AI_STATUS', payload: 'thinking' });
-                dispatch({ type: 'SET_DIAGNOSIS', payload: { case_id: 'LIVE-PT-SESSION', deterministic_findings: currentFindings, diagnosis: null } });
-              } else if (event.type === 'token') {
-                dispatch({ type: 'SET_AI_STATUS', payload: 'streaming' });
-                rawJson += event.token;
-                dispatch({ type: 'SET_STREAMED_RAW', payload: rawJson });
-              } else if (event.type === 'done') {
-                doneReading = true;
-              }
-            } catch (e) {
-              console.error('SSE parse error', e);
-            }
+      // Save to history audit trail
+      if (data.diagnosis) {
+        dispatch({
+          type: 'ADD_HISTORY_ENTRY',
+          payload: {
+            id: 'diag-' + Date.now(),
+            caseId: data.case_id || selectedPreset || 'LIVE-PT',
+            rootCause: data.diagnosis.root_cause || 'Network Anomaly',
+            osiLayer: data.diagnosis.osi_layer || 'Network',
+            confidence: Math.round((data.diagnosis.confidence_score || 0.95) * 100),
+            date: new Date().toLocaleDateString(),
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            cliEvidence: data.diagnosis.cli_evidence_quote || '',
+            fixSteps: data.diagnosis.fix_steps || [],
+            diagnosisObj: data
           }
-        }
+        });
       }
 
-      try {
-        const jsonMatch = rawJson.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          const finalData = JSON.parse(jsonMatch[0]);
-          const diagnosisPayload = { case_id: 'LIVE-PT-SESSION', deterministic_findings: currentFindings, diagnosis: finalData };
-          dispatch({ type: 'SET_DIAGNOSIS', payload: diagnosisPayload });
-          dispatch({ type: 'SET_STREAMED_RAW', payload: '' });
-
-          // Auto-save to Diagnosis History
-          dispatch({
-            type: 'ADD_HISTORY_ENTRY',
-            payload: {
-              id: 'diag-' + Date.now(),
-              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-              date: new Date().toLocaleDateString(),
-              caseId: finalData?.case_id || 'LIVE-PT-SESSION',
-              rootCause: finalData?.root_cause || 'Network Anomaly Detected',
-              osiLayer: finalData?.osi_layer || 'Network',
-              confidence: Math.round((finalData?.confidence_score || 0.95) * 100),
-              fixSteps: finalData?.fix_steps || [],
-              cliEvidence: finalData?.cli_evidence_quote || '',
-              cliInput: state.cliInput,
-              modelUsed: state.currentModel,
-              approved: false,
-              diagnosisObj: diagnosisPayload,
-            }
-          });
-
-          toast.success('Diagnostic analysis complete');
-        }
-      } catch (e) {
-        console.error('Final parse error', e);
-      }
+      toast.success('Diagnosis and remediation synthesized!');
     } catch (e) {
-      toast.error('Error: ' + e.message);
+      toast.error('Diagnosis failed: ' + e.message);
+      dispatch({ type: 'SET_AI_STATUS', payload: 'offline' });
     } finally {
       setIsDiagnosing(false);
-      dispatch({ type: 'SET_AI_STATUS', payload: 'idle' });
     }
   };
 
   if (state.activeView !== 'tab-input') return null;
 
-  const isWaiting = !state.cliInput || state.cliInput.startsWith('# Waiting');
-  const promptInfo = parseCiscoPrompt(state.cliInput);
-
   return (
-    <section className="flex-1 flex flex-col p-6 overflow-hidden">
-      <div className="max-w-4xl w-full mx-auto flex flex-col flex-1 gap-4">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+    <section className="flex-1 p-6 lg:p-8 overflow-y-auto bg-background font-sans">
+      <div className="max-w-5xl mx-auto space-y-5 animate-in fade-in duration-300">
+        
+        {/* Top Header & Presets Bar */}
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/80">
           <div>
-            <h1 className="text-lg font-semibold tracking-tight text-foreground">CLI Capture</h1>
-            <p className="text-sm text-muted-foreground">Paste Cisco IOS output or enable the clipboard listener.</p>
+            <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
+              <div className="w-7 h-7 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                <TerminalIcon size={16} />
+              </div>
+              Interactive Ingestion Canvas
+            </h1>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Paste CLI terminal outputs, drop screenshots (Ctrl+V), or select standardized CCNA lab scenarios
+            </p>
           </div>
+
+          {/* Quick Preset Selector */}
           <div className="flex items-center gap-2">
-            {selectedText && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={explainSelection}
-                className="gap-1.5 rounded-xl text-xs h-8 bg-blue-600/10 border-blue-500/30 text-blue-400 hover:bg-blue-600/20"
-              >
-                <HelpCircle size={13} />
-                <span>Explain Selected Snippet</span>
-              </Button>
-            )}
-            <Button
-              variant={listenerRunning ? "default" : "outline"}
-              size="sm"
-              onClick={toggleListener}
-              className={cn("gap-2 rounded-xl text-xs h-8", listenerRunning && "bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-600/20")}
+            <span className="text-[11px] font-medium text-muted-foreground hidden md:inline">Preset Scenarios:</span>
+            <select
+              value={selectedPreset}
+              onChange={handleSelectPreset}
+              className="bg-card border border-border text-xs text-foreground rounded-xl px-3 py-1.5 focus:outline-none focus:border-blue-500/50 cursor-pointer shadow-sm"
             >
-              {listenerRunning ? <Wifi size={13} /> : <WifiOff size={13} />}
-              {listenerRunning ? 'Listener Active' : 'Start Listener'}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleDiscoverTopology}
-              disabled={isDiscoveringTopology || state.isCopilotStreaming}
-              className="gap-2 rounded-xl text-xs h-8 hover:bg-emerald-600/20 text-emerald-500 border-emerald-500/30"
-            >
-              <Map size={13} />
-              {isDiscoveringTopology ? 'Mapping Topology...' : state.isCopilotStreaming ? 'Copilot Analyzing...' : 'Map Topology'}
-            </Button>
-            {!state.isCopilotOpen && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => dispatch({ type: 'TOGGLE_COPILOT' })}
-                className="gap-1.5 rounded-xl text-xs h-8 border-white/10 hover:bg-white/[0.06] text-zinc-300 hover:text-white"
-              >
-                <Bot size={13} className="text-blue-400" />
-                <span>Open Copilot</span>
-              </Button>
-            )}
+              <option value="">Load Sample CCNA Lab...</option>
+              {PRESET_CASES.map(c => (
+                <option key={c.id} value={c.id}>[{c.layer}] {c.name}</option>
+              ))}
+            </select>
           </div>
+        </header>
+
+        {/* Vision Dropzone Banner */}
+        <div 
+          className={cn(
+            "p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 text-xs",
+            isOcrLoading 
+              ? "bg-blue-500/10 border-blue-500/40 text-blue-300 animate-pulse" 
+              : "bg-card/70 backdrop-blur-md border-border/70 text-muted-foreground hover:border-blue-500/30"
+          )}
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-xl bg-zinc-800 flex items-center justify-center text-zinc-400 flex-shrink-0">
+              <Camera size={15} />
+            </div>
+            <div>
+              <span className="font-medium text-foreground block">
+                {isOcrLoading ? "Processing Multi-Pass OCR Super-Resolution..." : "Visual Screenshot Ingestion Active"}
+              </span>
+              <span className="text-[11px] text-zinc-500 block">
+                Capture any CLI window or topology diagram (`Win+Shift+S`) and press <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono text-[10px]">Ctrl+V</kbd> anywhere
+              </span>
+            </div>
+          </div>
+          {listenerRunning && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-medium font-mono">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>PT Clipboard Sync Active</span>
+            </div>
+          )}
         </div>
 
-        {/* Terminal Chrome */}
-        <div className="flex-1 rounded-xl overflow-hidden border border-border bg-card shadow-sm flex flex-col min-h-0">
-          {/* Title Bar */}
-          <div className="flex items-center justify-between px-4 py-2 bg-muted/30 border-b border-border flex-shrink-0">
-            <div className="flex items-center gap-3">
-              <div className="flex gap-1.5">
-                <span className="w-3 h-3 rounded-full bg-red-500/80"></span>
-                <span className="w-3 h-3 rounded-full bg-yellow-500/80"></span>
-                <span className="w-3 h-3 rounded-full bg-green-500/80"></span>
+        {/* Cisco Terminal Window */}
+        <div className="cisco-terminal-window rounded-2xl overflow-hidden shadow-2xl border border-border/90 flex flex-col">
+          {/* macOS / Cisco Terminal Header */}
+          <div className="h-10 bg-zinc-950/80 px-4 border-b border-border/60 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 mr-2">
+                <div className="w-3 h-3 rounded-full bg-rose-500/80 border border-rose-600" />
+                <div className="w-3 h-3 rounded-full bg-amber-500/80 border border-amber-600" />
+                <div className="w-3 h-3 rounded-full bg-emerald-500/80 border border-emerald-600" />
               </div>
-              <span className="text-xs font-medium text-muted-foreground">cisco-ios-cli — NetSage</span>
-              {listenerRunning && (
-                <span className="flex items-center gap-1.5 text-[10px] font-medium text-green-500 bg-green-500/10 px-2 py-0.5 rounded-full">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                  LIVE
-                </span>
-              )}
+              <span className="text-[11px] font-mono text-zinc-400 font-semibold tracking-wide">
+                Cisco Packet Tracer — Live CLI Terminal Buffer
+              </span>
             </div>
-            <div className="flex gap-1">
-              <Button variant="ghost" size="sm" className="h-6 text-xs px-2 gap-1" onClick={pasteFromClipboard}>
-                <Clipboard size={12} /> Paste
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  navigator.clipboard.writeText(state.cliInput || '');
+                  toast.success('CLI buffer copied to clipboard');
+                }}
+                className="h-6 px-2 text-[11px] text-zinc-400 hover:text-zinc-200 gap-1"
+                title="Copy buffer"
+              >
+                <Copy size={11} /> Copy
               </Button>
-              <Button variant="ghost" size="sm" className="h-6 text-xs px-2 gap-1" onClick={copyToClipboard}>
-                <Copy size={12} /> Copy
-              </Button>
-              <Button variant="ghost" size="sm" className="h-6 text-xs px-2 gap-1 text-destructive hover:text-destructive" onClick={() => dispatch({ type: 'SET_CLI_INPUT', payload: '' })}>
-                <Trash2 size={12} /> Clear
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  dispatch({ type: 'SET_CLI_INPUT', payload: '' });
+                  setSelectedPreset('');
+                  toast.info('CLI buffer cleared');
+                }}
+                className="h-6 px-2 text-[11px] text-zinc-400 hover:text-rose-400 gap-1"
+                title="Clear buffer"
+              >
+                <Trash2 size={11} /> Clear
               </Button>
             </div>
           </div>
 
-          {/* Editor Body with Line Numbers */}
-          <div className="flex flex-1 min-h-0 overflow-hidden">
+          {/* Editor Body */}
+          <div className="relative flex bg-[#080a10] min-h-[380px] max-h-[520px] font-mono text-xs">
             {/* Line Numbers */}
-            <div
+            <div 
               ref={lineNumbersRef}
-              className="w-12 flex-shrink-0 bg-muted/20 border-r border-border overflow-hidden select-none pt-4 pb-4"
+              className="w-11 py-3 bg-zinc-950/50 border-r border-border/40 text-right pr-3 select-none text-zinc-600 overflow-hidden leading-relaxed font-mono text-[11px]"
             >
-              {Array.from({ length: lineCount }, (_, i) => (
-                <div key={i} className="text-right pr-3 text-[11px] leading-[1.65rem] font-mono text-muted-foreground/50">
-                  {i + 1}
-                </div>
+              {Array.from({ length: Math.max(lineCount, 15) }, (_, i) => (
+                <div key={i + 1}>{i + 1}</div>
               ))}
             </div>
 
             {/* Textarea */}
             <textarea
               ref={textareaRef}
-              className="flex-1 p-4 bg-transparent text-sm font-mono text-foreground focus:outline-none resize-none overflow-y-auto leading-[1.65rem] scrollbar-none"
-              spellCheck="false"
-              value={state.cliInput}
-              onChange={(e) => dispatch({ type: 'SET_CLI_INPUT', payload: e.target.value })}
-              onSelect={handleSelect}
               onScroll={handleScroll}
               onPaste={handlePaste}
-              placeholder={isOcrLoading ? "Extracting text from image via OCR..." : "Paste your Cisco IOS CLI output or an image screenshot here..."}
+              value={state.cliInput}
+              onChange={(e) => dispatch({ type: 'SET_CLI_INPUT', payload: e.target.value })}
+              placeholder="# Paste Cisco IOS show-command output here, or drop a screenshot (Ctrl+V)..."
+              className="flex-1 p-3 bg-transparent text-zinc-200 focus:outline-none resize-none leading-relaxed font-mono text-xs placeholder:text-zinc-600 scrollbar-mini selection:bg-blue-500/30 selection:text-white"
+              spellCheck={false}
             />
+          </div>
+
+          {/* Terminal Footer Bar */}
+          <div className="h-9 bg-zinc-950/90 border-t border-border/50 px-4 flex items-center justify-between text-[11px] font-mono text-zinc-500">
+            <div className="flex items-center gap-3">
+              <span>{lineCount} lines</span>
+              <span>{(state.cliInput || '').length} characters</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+              <span className="text-zinc-400">Ready for Invariant Scan</span>
+            </div>
           </div>
         </div>
 
-        {/* Action Bar */}
-        <div className="flex items-center justify-between flex-shrink-0">
-          <span className="text-xs text-muted-foreground font-mono">
-            {lineCount} lines · {(state.cliInput || '').length} chars
-            {promptInfo.mode !== 'Unknown' && (
-              <>
-                <span className="mx-2">·</span>
-                <span className="text-blue-400 font-medium">{promptInfo.mode}</span>
-              </>
-            )}
-          </span>
-          <Button onClick={handleDiagnose} disabled={isDiagnosing || isWaiting} className="gap-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-lg shadow-blue-600/20">
-            <Play size={14} />
-            {isDiagnosing ? 'Analyzing...' : 'Run Diagnostic Engine'}
+        {/* Bottom Actions Hub */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDiscoverTopology}
+            disabled={isDiscoveringTopology}
+            className="h-10 px-4 rounded-xl border-border bg-card/60 hover:bg-card text-xs text-foreground gap-2 w-full sm:w-auto"
+          >
+            <Map size={14} className="text-blue-400" />
+            <span>{isDiscoveringTopology ? "Mapping Topology..." : "Map Topology Graph (CDP)"}</span>
+          </Button>
+
+          <Button
+            variant="default"
+            size="lg"
+            onClick={handleDiagnose}
+            disabled={isDiagnosing}
+            className="h-11 px-6 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs tracking-wide shadow-lg shadow-blue-500/25 gap-2 w-full sm:w-auto transition-all"
+          >
+            <Play size={14} className={isDiagnosing ? "animate-spin" : "fill-current"} />
+            <span>{isDiagnosing ? "Synthesizing Diagnosis..." : "Run Diagnostic Engine"}</span>
           </Button>
         </div>
+
       </div>
     </section>
   );
