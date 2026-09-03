@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import PacketFlowAnimation from './PacketFlowAnimation';
+import AiOpsScanOverlay from './AiOpsScanOverlay';
 
 export default function DiagnosisView() {
   const { state, dispatch } = useAppContext();
@@ -122,6 +123,7 @@ ${(d.fix_steps || []).join('\n')}
           </div>
         ) : isStreaming ? (
           <div className="space-y-5 animate-in fade-in duration-300">
+            <AiOpsScanOverlay isScanning={true} />
             <header className="border-b border-border/80 pb-4 flex items-center justify-between">
               <div>
                 <h1 className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
