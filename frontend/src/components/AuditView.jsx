@@ -49,7 +49,7 @@ export default function AuditView() {
 
   // Latency over time
   const latencyData = data.map((row, idx) => ({
-    name: Case ,
+    name: `Case ${idx + 1}`,
     latency: row.inference_time_ms
   }));
 

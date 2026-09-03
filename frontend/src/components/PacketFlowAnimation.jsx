@@ -211,6 +211,8 @@ export default function PacketFlowAnimation({
   return (
     <div className="w-full rounded-2xl overflow-hidden border border-border/80 shadow-lg bg-card/60 backdrop-blur-md">
       <Player
+        acknowledgeRemotionLicense
+        muted
         component={PacketFlowComposition}
         inputProps={{
           hasAnomaly,
