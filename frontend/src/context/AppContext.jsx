@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+﻿import React, { createContext, useContext, useReducer, useEffect } from 'react';
 
 const AppContext = createContext();
 
@@ -11,6 +11,46 @@ const initialHistory = (() => {
   }
 })();
 
+const defaultWelcomeMessage = {
+  id: 'welcome-1',
+  role: 'assistant',
+  content: 'Hello! I am **NetSage Copilot**.\n\nI can explain network anomalies, decode Cisco IOS CLI outputs, and guide you through Packet Tracer configuration fixes. What would you like to explore?',
+  timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+};
+
+const createFreshSession = (customTitle = null) => {
+  const id = 'session-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+  return {
+    id,
+    title: customTitle || 'New Conversation',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    messages: [{ ...defaultWelcomeMessage, id: 'welcome-' + Date.now() }]
+  };
+};
+
+const { initialSessions, initialActiveId } = (() => {
+  try {
+    const saved = localStorage.getItem('netsage_chat_sessions');
+    const sessions = saved ? JSON.parse(saved) : [];
+    if (Array.isArray(sessions) && sessions.length > 0) {
+      const savedActive = localStorage.getItem('netsage_active_chat_id');
+      const activeExists = sessions.some(s => s.id === savedActive);
+      return {
+        initialSessions: sessions,
+        initialActiveId: activeExists ? savedActive : sessions[0].id
+      };
+    }
+  } catch (e) {}
+  const fresh = createFreshSession();
+  return {
+    initialSessions: [fresh],
+    initialActiveId: fresh.id
+  };
+})();
+
+const initialActiveSession = initialSessions.find(s => s.id === initialActiveId) || initialSessions[0];
+
 const initialState = {
   activeView: 'tab-input',
   theme: localStorage.getItem('netsage_theme') || 'dark',
@@ -22,21 +62,47 @@ const initialState = {
   diagnosis: null,
   streamedRaw: '',
   diagnosisHistory: initialHistory,
-  chatMessages: [
-    {
-      id: 'welcome-1',
-      role: 'assistant',
-      content: 'Hello! I am **NetSage Copilot**.\n\nI can explain network anomalies, decode Cisco IOS CLI outputs, and guide you through Packet Tracer configuration fixes. What would you like to explore?',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }
-  ],
+  chatSessions: initialSessions,
+  activeSessionId: initialActiveId,
+  chatMessages: initialActiveSession ? initialActiveSession.messages : [defaultWelcomeMessage],
   pendingCopilotPrompt: '',
   cliInput: '# Waiting for Packet Tracer CLI capture...\n# 1. Start python pt_listener.py\n# 2. Copy any show-command output in Packet Tracer.',
   currentModel: 'qwen2.5-coder:3b',
   isCopilotOpen: true,
   isSidebarCollapsed: false,
-    isListenerRunning: false,
+  isListenerRunning: false,
 };
+
+function syncSessions(sessions, activeId) {
+  try {
+    localStorage.setItem('netsage_chat_sessions', JSON.stringify(sessions));
+    localStorage.setItem('netsage_active_chat_id', activeId);
+  } catch (e) {}
+}
+
+function autoTitleSession(session, messages) {
+  if (session.title && session.title !== 'New Conversation') return session.title;
+  const firstUser = messages.find(m => m.role === 'user');
+  if (!firstUser || !firstUser.content) return 'New Conversation';
+  const clean = firstUser.content.trim().replace(/^[^a-zA-Z0-9]+/, '');
+  const title = clean.split('\n')[0].substring(0, 36);
+  return title.length > 2 ? (title + (clean.length > 36 ? '...' : '')) : 'New Conversation';
+}
+
+function updateActiveSessionInList(sessions, activeId, updatedMessages) {
+  return sessions.map(s => {
+    if (s.id === activeId) {
+      const newTitle = autoTitleSession(s, updatedMessages);
+      return {
+        ...s,
+        title: newTitle,
+        updatedAt: new Date().toISOString(),
+        messages: updatedMessages
+      };
+    }
+    return s;
+  });
+}
 
 function reducer(state, action) {
   switch (action.type) {
@@ -95,17 +161,93 @@ function reducer(state, action) {
       try { localStorage.removeItem('netsage_history'); } catch (e) {}
       return { ...state, diagnosisHistory: [] };
     }
-    case 'ADD_CHAT_MESSAGE':
-      return { ...state, chatMessages: [...state.chatMessages, action.payload] };
-    case 'SET_CHAT_MESSAGES':
-      return { ...state, chatMessages: action.payload };
+
+    // ==========================================
+    // CHAT & SESSION MANAGEMENT
+    // ==========================================
+    case 'CREATE_NEW_CHAT_SESSION': {
+      const newSession = createFreshSession(action.payload?.title);
+      const updatedSessions = [newSession, ...state.chatSessions];
+      syncSessions(updatedSessions, newSession.id);
+      return {
+        ...state,
+        chatSessions: updatedSessions,
+        activeSessionId: newSession.id,
+        chatMessages: newSession.messages,
+        isCopilotOpen: true
+      };
+    }
+    case 'SWITCH_CHAT_SESSION': {
+      const targetId = action.payload;
+      const targetSession = state.chatSessions.find(s => s.id === targetId);
+      if (!targetSession) return state;
+      syncSessions(state.chatSessions, targetId);
+      return {
+        ...state,
+        activeSessionId: targetId,
+        chatMessages: targetSession.messages,
+        isCopilotOpen: true
+      };
+    }
+    case 'DELETE_CHAT_SESSION': {
+      const targetId = action.payload;
+      const remainingSessions = state.chatSessions.filter(s => s.id !== targetId);
+      if (remainingSessions.length === 0) {
+        const fresh = createFreshSession();
+        syncSessions([fresh], fresh.id);
+        return {
+          ...state,
+          chatSessions: [fresh],
+          activeSessionId: fresh.id,
+          chatMessages: fresh.messages
+        };
+      }
+      let nextActiveId = state.activeSessionId;
+      let nextMessages = state.chatMessages;
+      if (state.activeSessionId === targetId) {
+        nextActiveId = remainingSessions[0].id;
+        nextMessages = remainingSessions[0].messages;
+      }
+      syncSessions(remainingSessions, nextActiveId);
+      return {
+        ...state,
+        chatSessions: remainingSessions,
+        activeSessionId: nextActiveId,
+        chatMessages: nextMessages
+      };
+    }
+    case 'RENAME_CHAT_SESSION': {
+      const { sessionId, title } = action.payload;
+      const updatedSessions = state.chatSessions.map(s => s.id === sessionId ? { ...s, title: title.trim() || 'Untitled Chat' } : s);
+      syncSessions(updatedSessions, state.activeSessionId);
+      return { ...state, chatSessions: updatedSessions };
+    }
+    case 'ADD_CHAT_MESSAGE': {
+      const updatedMessages = [...state.chatMessages, action.payload];
+      const updatedSessions = updateActiveSessionInList(state.chatSessions, state.activeSessionId, updatedMessages);
+      syncSessions(updatedSessions, state.activeSessionId);
+      return {
+        ...state,
+        chatMessages: updatedMessages,
+        chatSessions: updatedSessions
+      };
+    }
+    case 'SET_CHAT_MESSAGES': {
+      const updatedMessages = action.payload;
+      const updatedSessions = updateActiveSessionInList(state.chatSessions, state.activeSessionId, updatedMessages);
+      syncSessions(updatedSessions, state.activeSessionId);
+      return {
+        ...state,
+        chatMessages: updatedMessages,
+        chatSessions: updatedSessions
+      };
+    }
     case 'BRANCH_CHAT_MESSAGE': {
       const { userMsgIndex, newPrompt, newAssistantMsgId } = action.payload;
       const msgs = [...state.chatMessages];
       const targetUser = msgs[userMsgIndex];
       const targetAssistant = msgs[userMsgIndex + 1];
 
-      // Update user message versions
       const userVersions = targetUser.versions ? [...targetUser.versions, newPrompt] : [targetUser.content, newPrompt];
       const newVersionIdx = userVersions.length - 1;
       msgs[userMsgIndex] = {
@@ -115,7 +257,6 @@ function reducer(state, action) {
         currentVersionIndex: newVersionIdx
       };
 
-      // Update or create assistant message versions
       if (targetAssistant && targetAssistant.role === 'assistant') {
         const assistantVersions = targetAssistant.versions ? [...targetAssistant.versions, ''] : [targetAssistant.content, ''];
         msgs[userMsgIndex + 1] = {
@@ -135,9 +276,14 @@ function reducer(state, action) {
         });
       }
 
-      // Truncate any messages that came after this turn in the old branch
       const truncated = msgs.slice(0, userMsgIndex + 2);
-      return { ...state, chatMessages: truncated };
+      const updatedSessions = updateActiveSessionInList(state.chatSessions, state.activeSessionId, truncated);
+      syncSessions(updatedSessions, state.activeSessionId);
+      return {
+        ...state,
+        chatMessages: truncated,
+        chatSessions: updatedSessions
+      };
     }
     case 'SWITCH_CHAT_VERSION': {
       const { userMsgIndex, targetVersionIndex } = action.payload;
@@ -159,7 +305,13 @@ function reducer(state, action) {
           currentVersionIndex: targetVersionIndex
         };
       }
-      return { ...state, chatMessages: msgs };
+      const updatedSessions = updateActiveSessionInList(state.chatSessions, state.activeSessionId, msgs);
+      syncSessions(updatedSessions, state.activeSessionId);
+      return {
+        ...state,
+        chatMessages: msgs,
+        chatSessions: updatedSessions
+      };
     }
     case 'UPDATE_LAST_CHAT_MESSAGE': {
       if (state.chatMessages.length === 0) return state;
@@ -178,10 +330,24 @@ function reducer(state, action) {
         versions: updatedVersions || [action.payload],
         currentVersionIndex: current.currentVersionIndex !== undefined ? current.currentVersionIndex : 0
       };
-      return { ...state, chatMessages: newMsgs };
+      const updatedSessions = updateActiveSessionInList(state.chatSessions, state.activeSessionId, newMsgs);
+      syncSessions(updatedSessions, state.activeSessionId);
+      return {
+        ...state,
+        chatMessages: newMsgs,
+        chatSessions: updatedSessions
+      };
     }
-    case 'CLEAR_CHAT':
-      return { ...state, chatMessages: [] };
+    case 'CLEAR_CHAT': {
+      const welcome = { ...defaultWelcomeMessage, id: 'welcome-' + Date.now() };
+      const updatedSessions = updateActiveSessionInList(state.chatSessions, state.activeSessionId, [welcome]);
+      syncSessions(updatedSessions, state.activeSessionId);
+      return {
+        ...state,
+        chatMessages: [welcome],
+        chatSessions: updatedSessions
+      };
+    }
     case 'SET_COPILOT_PROMPT':
       return { ...state, pendingCopilotPrompt: action.payload, isCopilotOpen: true };
     default:
@@ -198,11 +364,10 @@ export function AppProvider({ children }) {
     localStorage.setItem('netsage_theme', state.theme);
   }, [state.theme]);
 
-    // Live Poller & PT Listener Sync
+  // Live Poller & PT Listener Sync
   useEffect(() => {
     const poll = async () => {
       try {
-        // 1. Live Packet Tracer buffer sync
         const res = await fetch('/api/live');
         if (!res.ok) {
           dispatch({ type: 'SET_BACKEND_CONNECTED', payload: false });
@@ -222,7 +387,6 @@ export function AppProvider({ children }) {
           } catch(e) {}
         }
 
-        // 2. Global PT Listener process sync
         const lRes = await fetch('/api/listener/status');
         if (lRes.ok) {
           const lData = await lRes.json();

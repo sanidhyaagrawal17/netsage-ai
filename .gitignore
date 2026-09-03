@@ -47,3 +47,10 @@ tesseract/
 
 # Start script
 start.bat
+
+# PowerPoint Working Drafts (Keep only official Academic PPT)
+docs/NetSage_AI_Synopsis_DarkTheme.pptx
+docs/NetSage_AI_Synopsis_Deck.pptx
+docs/NetSage_AI_Synopsis_Deck_Dark.pptx
+docs/NetSage_AI_Synopsis_Final.pptx
+docs/NetSage_AI_Synopsis_Presentation.pptx

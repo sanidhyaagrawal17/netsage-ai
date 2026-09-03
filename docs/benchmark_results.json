@@ -1,0 +1,279 @@
+{
+  "total_cases": 30,
+  "overall_accuracy": 100.0,
+  "mean_latency_ms": 1.84,
+  "layers": [
+    {
+      "layer": "Data Link",
+      "total": 8,
+      "tp": 8,
+      "accuracy": 100.0
+    },
+    {
+      "layer": "Physical",
+      "total": 1,
+      "tp": 1,
+      "accuracy": 100.0
+    },
+    {
+      "layer": "Network",
+      "total": 9,
+      "tp": 9,
+      "accuracy": 100.0
+    },
+    {
+      "layer": "Transport",
+      "total": 6,
+      "tp": 6,
+      "accuracy": 100.0
+    },
+    {
+      "layer": "Application",
+      "total": 6,
+      "tp": 6,
+      "accuracy": 100.0
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "CASE-001",
+      "layer": "Data Link",
+      "expected_fault": "access vlan mismatch between host-a (vlan 10) and host-b (vlan 20) on destination switch port gi0/2.",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 17.85
+    },
+    {
+      "case_id": "CASE-002",
+      "layer": "Data Link",
+      "expected_fault": "native vlan mismatch across 802.1q trunk link (sw1 native vlan 1 vs sw2 native vlan 99).",
+      "findings_count": 2,
+      "detected": true,
+      "latency_ms": 2.21
+    },
+    {
+      "case_id": "CASE-003",
+      "layer": "Data Link",
+      "expected_fault": "vlan 30 is pruned/omitted from the allowed vlan list on sw1 trunk interface gi0/1.",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 1.27
+    },
+    {
+      "case_id": "CASE-004",
+      "layer": "Data Link",
+      "expected_fault": "port gi0/5 entered err-disabled state due to bpdu guard activation upon receiving unauthorized bpdus.",
+      "findings_count": 4,
+      "detected": true,
+      "latency_ms": 1.65
+    },
+    {
+      "case_id": "CASE-005",
+      "layer": "Data Link",
+      "expected_fault": "duplex mismatch on gi0/10 (switch is full-duplex, connected endpoint is half-duplex), causing late collisions and crc errors.",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 1.47
+    },
+    {
+      "case_id": "CASE-006",
+      "layer": "Data Link",
+      "expected_fault": "etherchannel protocol mismatch: sw1 configured with lacp (channel-group 1 mode active) while sw2 configured with static manual mode (mode on).",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 2.25
+    },
+    {
+      "case_id": "CASE-007",
+      "layer": "Data Link",
+      "expected_fault": "layer 2 switching loop causing mac address flapping on vlan 10 between gi0/1 and gi0/2.",
+      "findings_count": 2,
+      "detected": true,
+      "latency_ms": 1.67
+    },
+    {
+      "case_id": "CASE-008",
+      "layer": "Data Link",
+      "expected_fault": "both switchports configured in 'dynamic auto' dtp mode; neither initiates trunk negotiation, defaulting link to access mode.",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 1.25
+    },
+    {
+      "case_id": "CASE-009",
+      "layer": "Physical",
+      "expected_fault": "gigabitethernet0/1 interface is shutdown (administratively down), blocking physical carrier and ip traffic.",
+      "findings_count": 2,
+      "detected": true,
+      "latency_ms": 1.07
+    },
+    {
+      "case_id": "CASE-010",
+      "layer": "Network",
+      "expected_fault": "incorrect default gateway configured on pc-1 (192.168.20.1 instead of 192.168.10.1), placing gateway outside host subnet.",
+      "findings_count": 2,
+      "detected": true,
+      "latency_ms": 3.53
+    },
+    {
+      "case_id": "CASE-011",
+      "layer": "Network",
+      "expected_fault": "subnet mask mismatch: host-a configured with /25 mask (255.255.255.128, range .1-.126), treating 10.0.1.200 as an off-subnet destination.",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 0.89
+    },
+    {
+      "case_id": "CASE-012",
+      "layer": "Network",
+      "expected_fault": "missing static route or default gateway for destination network 172.16.100.0/24 in r1 routing table.",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 0.62
+    },
+    {
+      "case_id": "CASE-013",
+      "layer": "Network",
+      "expected_fault": "ospf interface mtu mismatch (r1 mtu 1500 vs r2 mtu 1492), preventing completion of database description (dbd) packet exchange.",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 0.76
+    },
+    {
+      "case_id": "CASE-014",
+      "layer": "Network",
+      "expected_fault": "ospf area id mismatch: r1 interface gi0/1 is in area 0 while r2 interface gi0/1 is in area 1.",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 0.79
+    },
+    {
+      "case_id": "CASE-015",
+      "layer": "Network",
+      "expected_fault": "ospf hello and dead timer interval mismatch (r1 hello 10/dead 40 vs r2 hello 30/dead 120).",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 0.68
+    },
+    {
+      "case_id": "CASE-016",
+      "layer": "Network",
+      "expected_fault": "interface gigabitethernet0/2 configured as passive-interface in ospf process, suppressing ospf hello transmissions.",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 0.66
+    },
+    {
+      "case_id": "CASE-017",
+      "layer": "Network",
+      "expected_fault": "hsrp group number mismatch (r1 configured with group 10, r2 configured with group 20), causing both routers to assume active state.",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 0.82
+    },
+    {
+      "case_id": "CASE-018",
+      "layer": "Network",
+      "expected_fault": "static route next-hop address 172.16.1.2 is unreachable, preventing static route installation in the fib/routing table.",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 0.64
+    },
+    {
+      "case_id": "CASE-019",
+      "layer": "Transport",
+      "expected_fault": "workstation ip 192.168.1.55 falls outside the permitted acl range (192.168.1.0/27, .1-.31) and is dropped by implicit deny.",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 0.96
+    },
+    {
+      "case_id": "CASE-020",
+      "layer": "Transport",
+      "expected_fault": "extended acl 101 line 20 explicitly denies tcp port 443 (https) while only permitting tcp port 80 (www).",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 1.18
+    },
+    {
+      "case_id": "CASE-021",
+      "layer": "Transport",
+      "expected_fault": "inverted wildcard mask in acl 50 (configured with subnet mask 255.255.255.0 instead of wildcard mask 0.0.0.255).",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 1.12
+    },
+    {
+      "case_id": "CASE-022",
+      "layer": "Transport",
+      "expected_fault": "access list 105 is applied inbound on the external wan interface gi0/1 instead of outbound (or inbound on lan gi0/0).",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 1.49
+    },
+    {
+      "case_id": "CASE-023",
+      "layer": "Transport",
+      "expected_fault": "nat access-list 1 does not permit new subnet 10.10.50.0/24, preventing pat translation and internet forwarding.",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 1.9
+    },
+    {
+      "case_id": "CASE-024",
+      "layer": "Transport",
+      "expected_fault": "missing 'ip tcp adjust-mss 1360' on vpn tunnel interface causing tcp packet fragmentation and black-holing on df-bit packets.",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 1.01
+    },
+    {
+      "case_id": "CASE-025",
+      "layer": "Application",
+      "expected_fault": "dhcp ip pool 'floor3_lan' address space is completely exhausted (254 of 254 addresses leased).",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 0.65
+    },
+    {
+      "case_id": "CASE-026",
+      "layer": "Application",
+      "expected_fault": "missing 'ip helper-address 10.10.1.100' on gateway subinterface gi0/0.40, preventing dhcp discover broadcast relay.",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 1.37
+    },
+    {
+      "case_id": "CASE-027",
+      "layer": "Application",
+      "expected_fault": "incorrect dns server address (192.168.1.250) configured in dhcp pool; host fails name resolution requests.",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 1.85
+    },
+    {
+      "case_id": "CASE-028",
+      "layer": "Application",
+      "expected_fault": "ntp clock is unsynchronized (stratum 16, unreachable server), causing tls/802.1x certificate validation failures due to clock skew.",
+      "findings_count": 1,
+      "detected": true,
+      "latency_ms": 1.63
+    },
+    {
+      "case_id": "CASE-029",
+      "layer": "Application",
+      "expected_fault": "vty line access-class 23 denies ssh connections originating from the management jump host subnet (10.10.99.0/24).",
+      "findings_count": 2,
+      "detected": true,
+      "latency_ms": 0.99
+    },
+    {
+      "case_id": "CASE-030",
+      "layer": "Application",
+      "expected_fault": "nat pool 'public_pool' is 100% allocated with no available ip addresses, causing dynamic nat translation failures.",
+      "findings_count": 2,
+      "detected": true,
+      "latency_ms": 0.98
+    }
+  ]
+}

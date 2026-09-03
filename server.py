@@ -332,6 +332,32 @@ def run_chat_stream(req: ChatRequest):
     return StreamingResponse(generate_chat_events(), media_type="text/event-stream")
 
 
+CHAT_SESSIONS_DIR = BASE_DIR / "docs" / "chat_sessions"
+
+@app.get("/api/chat/sessions")
+def get_chat_sessions():
+    """List archived chat transcripts from disk."""
+    CHAT_SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+    sessions = []
+    for p in sorted(CHAT_SESSIONS_DIR.glob("*.json"), key=os.path.getmtime, reverse=True):
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                sessions.append(json.load(f))
+        except Exception:
+            continue
+    return {"sessions": sessions}
+
+@app.post("/api/chat/sessions")
+def save_chat_session(payload: Dict[str, Any]):
+    """Archive a completed chat session transcript to disk."""
+    CHAT_SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
+    session_id = payload.get("id") or f"session_{int(time.time())}"
+    filepath = CHAT_SESSIONS_DIR / f"{session_id}.json"
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+    return {"status": "success", "session_id": session_id}
+
+
 @app.post("/api/review")
 def submit_review(req: ReviewRequest):
     """Save human-in-the-loop review and failure taxonomy to responsible_ai_log.csv."""

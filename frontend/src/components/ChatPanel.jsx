@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
-import { MessageSquare, X, Send, Sparkles, Terminal, ChevronRight, Bot, Trash2, Layers, Loader2, Maximize2, Minimize2, Square, Edit2, ChevronLeft, Brain } from 'lucide-react';
+import { MessageSquare, X, Send, Sparkles, Terminal, ChevronRight, Bot, Trash2, Layers, Loader2, Maximize2, Minimize2, Square, Edit2, ChevronLeft, Brain, History, Plus, Search, Clock } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAppContext } from '../context/AppContext';
 import { motion, AnimatePresence } from 'motion/react';
@@ -27,6 +27,33 @@ export default function ChatPanel() {
   const messagesEndRef = useRef(null);
 
   const messages = state.chatMessages || [];
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const sessions = state.chatSessions || [];
+  const currentSession = sessions.find(s => s.id === state.activeSessionId) || sessions[0];
+
+  const filteredSessions = sessions.filter(s => 
+    (s.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (s.messages || []).some(m => (m.content || '').toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
+  const handleNewChat = () => {
+    dispatch({ type: 'CREATE_NEW_CHAT_SESSION' });
+    setIsHistoryOpen(false);
+    toast.success('Started new conversation');
+  };
+
+  const handleSwitchSession = (id) => {
+    dispatch({ type: 'SWITCH_CHAT_SESSION', payload: id });
+    setIsHistoryOpen(false);
+  };
+
+  const handleDeleteSession = (e, id) => {
+    e.stopPropagation();
+    dispatch({ type: 'DELETE_CHAT_SESSION', payload: id });
+    toast.info('Conversation removed');
+  };
 
   const messagesContainerRef = useRef(null);
   const isAutoScrollEnabled = useRef(true);
@@ -336,17 +363,44 @@ export default function ChatPanel() {
             <div className="w-7 h-7 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shadow-[0_0_12px_rgba(59,130,246,0.2)]">
               <Bot size={15} className="text-blue-400" />
             </div>
-            <div>
+            <div className="max-w-[170px] sm:max-w-[210px] overflow-hidden">
               <div className="flex items-center gap-1.5">
-                <span className="font-semibold text-xs text-foreground tracking-tight block">NetSage Copilot</span>
+                <span className="font-semibold text-xs text-foreground tracking-tight truncate block">
+                  {currentSession?.title || 'NetSage Copilot'}
+                </span>
                 {isMaximized && (
-                  <span className="text-[10px] font-medium text-blue-400 bg-blue-500/10 px-1.5 py-0.2 rounded">Full Screen</span>
+                  <span className="text-[10px] font-medium text-blue-400 bg-blue-500/10 px-1.5 py-0.2 rounded flex-shrink-0">Full Screen</span>
                 )}
               </div>
-              <span className="text-[10px] text-zinc-500 font-mono block -mt-0.5">Packet Tracer Assistant</span>
+              <span className="text-[10px] text-zinc-500 font-mono block -mt-0.5 truncate">
+                {sessions.length > 1 ? `${sessions.length} chats saved` : 'Packet Tracer Assistant'}
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {/* New Chat Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 rounded-lg text-zinc-500 hover:text-white hover:bg-white/[0.06]"
+              onClick={handleNewChat}
+              title="New Chat Conversation"
+            >
+              <Plus size={14} />
+            </Button>
+            {/* Chat History Drawer Toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "h-7 w-7 rounded-lg transition-colors",
+                isHistoryOpen ? "text-blue-400 bg-blue-500/15" : "text-zinc-500 hover:text-white hover:bg-white/[0.06]"
+              )}
+              onClick={() => setIsHistoryOpen(!isHistoryOpen)}
+              title="Chat History & Sessions"
+            >
+              <History size={13} />
+            </Button>
             {/* Fullscreen / Maximize Toggle */}
             <Button
               variant="ghost"
@@ -363,7 +417,7 @@ export default function ChatPanel() {
               size="icon"
               className="h-7 w-7 rounded-lg text-zinc-500 hover:text-white hover:bg-white/[0.06]"
               onClick={handleClearChat}
-              title="Clear Conversation"
+              title="Clear Active Conversation"
             >
               <Trash2 size={13} />
             </Button>
@@ -379,6 +433,71 @@ export default function ChatPanel() {
             </Button>
           </div>
         </header>
+
+        {/* In-Copilot Chat Sessions Drawer */}
+        {isHistoryOpen && (
+          <div className="border-b border-border bg-card/95 backdrop-blur p-3 space-y-2.5 animate-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-foreground flex items-center gap-1.5">
+                <History size={12} className="text-blue-400" />
+                Chat History ({sessions.length})
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleNewChat}
+                className="h-6 px-2 text-[10px] text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 gap-1 rounded-md"
+              >
+                <Plus size={11} /> New Chat
+              </Button>
+            </div>
+            <div className="relative">
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <input
+                type="text"
+                placeholder="Search conversations..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-zinc-900/60 border border-border rounded-lg pl-7 pr-2.5 py-1 text-xs text-foreground placeholder:text-zinc-600 focus:outline-none focus:border-blue-500/40"
+              />
+            </div>
+            <div className="max-h-48 overflow-y-auto space-y-1 scrollbar-mini pr-0.5">
+              {filteredSessions.length === 0 ? (
+                <div className="p-3 text-center text-zinc-500 text-[11px]">No conversations match your search</div>
+              ) : (
+                filteredSessions.map((s) => {
+                  const isActive = s.id === state.activeSessionId;
+                  const msgCount = s.messages ? s.messages.filter(m => m.role !== 'system').length : 0;
+                  return (
+                    <div
+                      key={s.id}
+                      onClick={() => handleSwitchSession(s.id)}
+                      className={cn(
+                        "group flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors text-xs",
+                        isActive ? "bg-blue-500/15 border border-blue-500/30 text-blue-300" : "hover:bg-white/[0.04] text-zinc-400 hover:text-zinc-200"
+                      )}
+                    >
+                      <div className="flex items-center gap-2 overflow-hidden flex-1 mr-2">
+                        <MessageSquare size={12} className={isActive ? "text-blue-400 flex-shrink-0" : "text-zinc-600 flex-shrink-0"} />
+                        <span className="truncate text-[11px] font-medium">{s.title}</span>
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <span className="text-[9px] text-zinc-500 font-mono">{msgCount} msgs</span>
+                        <button
+                          onClick={(e) => handleDeleteSession(e, s.id)}
+                          className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-rose-400 text-zinc-500 transition-opacity ml-1"
+                          title="Delete conversation"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Message Thread */}
         <div className="flex-1 p-4 overflow-y-auto space-y-4 font-sans scrollbar-mini">
