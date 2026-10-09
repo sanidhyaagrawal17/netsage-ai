@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
@@ -381,16 +381,32 @@ export default function TerminalInput() {
             <span>{isDiscoveringTopology ? "Mapping Topology..." : "Map Topology Graph (CDP)"}</span>
           </Button>
 
-          <Button
-            variant="default"
-            size="lg"
-            onClick={handleDiagnose}
-            disabled={isDiagnosing}
-            className="h-11 px-6 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs tracking-wide shadow-lg shadow-blue-500/25 gap-2 w-full sm:w-auto transition-all"
-          >
-            <Play size={14} className={isDiagnosing ? "animate-spin" : "fill-current"} />
-            <span>{isDiagnosing ? "Synthesizing Diagnosis..." : "Run Diagnostic Engine"}</span>
-          </Button>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => dispatch({ type: 'SET_COPILOT_OPEN', payload: !state.isCopilotOpen })}
+              className={cn(
+                "h-11 px-4 rounded-2xl border-border bg-card/60 hover:bg-card text-xs gap-2 flex-1 sm:flex-none transition-all",
+                state.isCopilotOpen ? "text-blue-400 border-blue-500/40 bg-blue-500/10 shadow-[0_0_15px_rgba(59,130,246,0.15)]" : "text-muted-foreground hover:text-foreground"
+              )}
+              title="Toggle NetSage Copilot Assistant"
+            >
+              <Bot size={15} className={state.isCopilotOpen ? "text-blue-400" : "text-zinc-400"} />
+              <span>Ask Copilot</span>
+            </Button>
+
+            <Button
+              variant="default"
+              size="lg"
+              onClick={handleDiagnose}
+              disabled={isDiagnosing}
+              className="h-11 px-6 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs tracking-wide shadow-lg shadow-blue-500/25 gap-2 flex-1 sm:flex-none transition-all"
+            >
+              <Play size={14} className={isDiagnosing ? "animate-spin" : "fill-current"} />
+              <span>{isDiagnosing ? "Synthesizing Diagnosis..." : "Run Diagnostic Engine"}</span>
+            </Button>
+          </div>
         </div>
 
       </div>

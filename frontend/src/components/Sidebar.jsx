@@ -15,6 +15,7 @@ import {
   ExternalLink,
   Pin,
   Sparkles,
+  Bot,
   Move
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -196,6 +197,47 @@ export default function Sidebar() {
 
             return buttonContent;
           })}
+          {/* Dedicated Copilot Toggle Button */}
+          <div className="pt-2 mt-2 border-t border-border/40">
+            {isCollapsed ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => dispatch({ type: 'SET_COPILOT_OPEN', payload: !state.isCopilotOpen })}
+                    className={cn(
+                      "relative flex items-center w-full rounded-xl text-xs font-medium transition-all duration-150 justify-center h-10 px-0",
+                      state.isCopilotOpen 
+                        ? "bg-blue-600/20 text-blue-400 border border-blue-500/40 shadow-[0_0_15px_rgba(59,130,246,0.2)]" 
+                        : "text-zinc-400 hover:text-foreground hover:bg-white/[0.04] border border-transparent"
+                    )}
+                    aria-label="Toggle NetSage Copilot Assistant"
+                  >
+                    <Bot size={17} className={state.isCopilotOpen ? "text-blue-400" : "text-zinc-400"} />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <span>NetSage Copilot (AI)</span>
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <button
+                onClick={() => dispatch({ type: 'SET_COPILOT_OPEN', payload: !state.isCopilotOpen })}
+                className={cn(
+                  "relative flex items-center w-full rounded-xl text-xs font-medium transition-all duration-150 gap-3 px-3 py-2.5",
+                  state.isCopilotOpen 
+                    ? "bg-blue-600/20 text-blue-400 border border-blue-500/40 shadow-[0_0_15px_rgba(59,130,246,0.2)]" 
+                    : "text-zinc-400 hover:text-foreground hover:bg-white/[0.04] border border-transparent"
+                )}
+                title="Toggle NetSage Copilot Assistant"
+              >
+                <Bot size={17} className={state.isCopilotOpen ? "text-blue-400" : "text-zinc-400"} />
+                <span className="flex-1 text-left truncate font-semibold">NetSage Copilot</span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-500/15 text-blue-400 border border-blue-500/30">
+                  AI
+                </span>
+              </button>
+            )}
+          </div>
         </nav>
 
         {/* Footer: Dedicated Pill Dock Zone & Theme */}
