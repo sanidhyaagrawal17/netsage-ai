@@ -2,7 +2,6 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from
 import { MessageSquare, X, Send, Sparkles, Terminal, ChevronRight, Bot, Trash2, Layers, Loader2, Maximize2, Minimize2, Square, Edit2, ChevronLeft, Brain, History, Plus, Search, Clock } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAppContext } from '../context/AppContext';
-import { motion, AnimatePresence } from 'motion/react';
 import { toast } from 'sonner';
 import ChatMessageContent from './ChatMessageContent';
 import { cn } from '../lib/utils';
@@ -99,22 +98,28 @@ export default function ChatPanel() {
     }
   }, [state.pendingCopilotPrompt]);
 
-  // Drag-to-resize handler
+  // Drag-to-resize handler with requestAnimationFrame throttle (60fps lock, no event queue backlog)
   const startResize = useCallback((e) => {
     e.preventDefault();
     setIsResizing(true);
     const startX = e.clientX;
     const startWidth = width;
 
+    let animFrame = null;
     const onMouseMove = (moveEvent) => {
-      const delta = startX - moveEvent.clientX; // Moving mouse left increases width
-      const maxWidth = window.innerWidth - (state.isSidebarCollapsed ? 80 : 260);
-      const newWidth = Math.max(280, Math.min(maxWidth, startWidth + delta));
-      setWidth(newWidth);
+      if (animFrame) return;
+      animFrame = requestAnimationFrame(() => {
+        const delta = startX - moveEvent.clientX; // Moving mouse left increases width
+        const maxWidth = window.innerWidth - (state.isSidebarCollapsed ? 80 : 260);
+        const newWidth = Math.max(280, Math.min(maxWidth, startWidth + delta));
+        setWidth(newWidth);
+        animFrame = null;
+      });
     };
 
     const onMouseUp = (upEvent) => {
       setIsResizing(false);
+      if (animFrame) cancelAnimationFrame(animFrame);
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
       const finalDelta = startX - upEvent.clientX;
@@ -320,7 +325,7 @@ export default function ChatPanel() {
     toast.info('Chat history cleared');
   };
 
-  if (!state.isCopilotOpen) return null;
+  const isOpen = state.isCopilotOpen;
 
   // Calculate actual width style
   const sidebarWidth = state.isSidebarCollapsed ? 64 : 240;
@@ -329,18 +334,31 @@ export default function ChatPanel() {
     : `${width}px`;
 
   return (
-    <AnimatePresence>
-      <motion.aside 
-        initial={{ width: 0, opacity: 0 }}
-        animate={{ width: currentWidthStyle, opacity: 1 }}
-        exit={{ width: 0, opacity: 0 }}
-        transition={isResizing ? { duration: 0 } : { type: "spring", stiffness: 350, damping: 30 }}
-        style={{ width: currentWidthStyle }}
-        className={cn(
-          "relative border-l border-border bg-card flex flex-col h-screen flex-shrink-0 transition-colors duration-200 shadow-2xl",
-          isMaximized && "z-20",
-          isResizing && "select-none cursor-col-resize"
-        )}
+    <aside 
+      style={{ 
+        width: isOpen ? currentWidthStyle : '0px',
+        transition: isResizing ? 'none' : 'width 240ms cubic-bezier(0.16, 1, 0.3, 1), opacity 180ms ease',
+        contain: 'layout paint',
+      }}
+      className={cn(
+        "relative bg-card flex flex-col h-screen flex-shrink-0 overflow-hidden",
+        isResizing ? "select-none cursor-col-resize" : "",
+        isOpen 
+          ? cn(
+              "opacity-100 border-l border-border shadow-2xl",
+              isMaximized ? "z-20" : "z-10"
+            ) 
+          : "opacity-0 border-l-0 pointer-events-none"
+      )}
+      aria-hidden={!isOpen}
+    >
+      {/* Locked-width inner content shell prevents child elements from reflowing or re-wrapping text during width animation */}
+      <div 
+        style={{
+          width: currentWidthStyle,
+          minWidth: isMaximized ? '100%' : '300px',
+        }}
+        className="h-full flex flex-col flex-shrink-0 overflow-hidden relative"
       >
         {/* Resize Handle (Left Edge) */}
         {!isMaximized && (
@@ -695,7 +713,7 @@ export default function ChatPanel() {
             )}
           </div>
         </div>
-      </motion.aside>
-    </AnimatePresence>
+      </div>
+    </aside>
   );
 }

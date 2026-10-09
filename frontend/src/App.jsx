@@ -24,7 +24,7 @@ function App() {
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans">
       <Sidebar />
-      <main className="flex-1 flex flex-col relative overflow-hidden">
+      <main className="flex-1 flex flex-col relative overflow-hidden min-w-0">
         <TerminalInput />
         <DiagnosisView />
         <Suspense fallback={<div className="p-8 flex items-center justify-center text-muted-foreground text-xs gap-2"><Loader2 className="animate-spin" size={14} /> Loading View...</div>}>
