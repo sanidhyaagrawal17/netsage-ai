@@ -9,11 +9,15 @@ import {
 import { cn } from '../lib/utils';
 import PacketFlowAnimation from './PacketFlowAnimation';
 import AiOpsScanOverlay from './AiOpsScanOverlay';
+import BorderBeam from './ui/BorderBeam';
+import TopologyFlowView from './TopologyFlowView';
+import { Network } from 'lucide-react';
 
 export default function DiagnosisView() {
   const { state, dispatch } = useAppContext();
   const diagnosis = state.diagnosis;
   const [reviewState, setReviewState] = useState(null); // 'approved' | 'rejected'
+  const [showTopologyModal, setShowTopologyModal] = useState(false);
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
@@ -147,6 +151,7 @@ ${(d.fix_steps || []).join('\n')}
             
             {/* Top Root Cause Hero Banner */}
             <div className="p-6 rounded-3xl glass-card space-y-3 relative overflow-hidden">
+              <BorderBeam rx={24} duration={10} colorFrom="#38bdf8" colorTo="#60a5fa" />
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold uppercase tracking-wider text-blue-400 bg-blue-500/15 border border-blue-500/30 px-3 py-1 rounded-full flex items-center gap-1.5">
@@ -195,7 +200,17 @@ ${(d.fix_steps || []).join('\n')}
                   <Activity size={13} className="text-blue-400" />
                   Visual Packet Transit Simulation (Programmatic Remotion 60fps)
                 </span>
-                <span className="text-[10px] text-zinc-500 font-mono">Looping Timeline Simulator</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-zinc-500 font-mono">60 FPS Simulator</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowTopologyModal(true)}
+                    className="h-6 px-2.5 text-[10px] font-mono gap-1 rounded-lg border-blue-500/30 text-blue-400 bg-blue-500/10 hover:bg-blue-500/20"
+                  >
+                    <Network size={11} /> Explore Property Graph G=(V,E)
+                  </Button>
+                </div>
               </div>
               <PacketFlowAnimation 
                 hasAnomaly={true}
@@ -345,6 +360,12 @@ ${(d.fix_steps || []).join('\n')}
         )}
 
       </div>
+      {showTopologyModal && (
+        <TopologyFlowView 
+          onClose={() => setShowTopologyModal(false)} 
+          hasMismatch={true} 
+        />
+      )}
     </section>
   );
 }

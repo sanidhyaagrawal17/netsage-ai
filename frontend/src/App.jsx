@@ -4,6 +4,7 @@ import TerminalInput from './components/TerminalInput';
 import DiagnosisView from './components/DiagnosisView';
 import ChatPanel from './components/ChatPanel';
 import FloatingStatus from './components/FloatingStatus';
+import CommandPalette from './components/CommandPalette';
 import { useAppContext } from './context/AppContext';
 import { Toaster } from './components/ui/sonner';
 import { Loader2 } from 'lucide-react';
@@ -34,6 +35,7 @@ function App() {
       </main>
       <ChatPanel />
       <FloatingStatus />
+      <CommandPalette />
       <Toaster position="bottom-right" theme={state.theme} />
     </div>
   );

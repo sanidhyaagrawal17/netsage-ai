@@ -244,3 +244,18 @@
   border: 1px solid rgba(244, 63, 94, 0.35);
   box-shadow: 0 0 16px rgba(244, 63, 94, 0.2);
 }
+
+/* Pure CSS Hardware-Accelerated Border Beam */
+@keyframes border-beam-dash {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -800;
+  }
+}
+
+.animate-border-beam-dash {
+  animation: border-beam-dash 8s linear infinite;
+  will-change: stroke-dashoffset;
+}

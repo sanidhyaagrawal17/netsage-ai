@@ -10,6 +10,7 @@ import {
   Moon, 
   PanelLeftClose, 
   PanelLeft,
+  Search,
   GripVertical,
   ExternalLink,
   Pin,
@@ -121,6 +122,26 @@ export default function Sidebar() {
         
         {/* Navigation Items */}
         <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto scrollbar-none">
+          {/* Spotlight Search Trigger */}
+          <button
+            onClick={() => {
+              const e = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true });
+              document.dispatchEvent(e);
+            }}
+            className={cn(
+              "flex items-center w-full rounded-xl text-xs text-muted-foreground hover:text-foreground bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.06] transition-all mb-3",
+              isCollapsed ? "justify-center h-10 px-0" : "justify-between px-3 py-2"
+            )}
+            title="Spotlight Search (Ctrl + K)"
+          >
+            <div className="flex items-center gap-2">
+              <Search size={14} className="text-zinc-400" />
+              {!isCollapsed && <span>Search...</span>}
+            </div>
+            {!isCollapsed && (
+              <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-[10px] font-mono text-zinc-400 border border-zinc-700">Ctrl K</kbd>
+            )}
+          </button>
           {navItems.map((item) => {
             const isActive = state.activeView === item.id;
             const buttonContent = (

@@ -7,6 +7,8 @@ import {
   Map, Info, Camera, Sparkles, Check, ChevronDown, Layers, Terminal as TerminalIcon
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+import BorderBeam from './ui/BorderBeam';
+import TopologyFlowView from './TopologyFlowView';
 
 const PRESET_CASES = [
   {
@@ -77,6 +79,7 @@ export default function TerminalInput() {
   const [lineCount, setLineCount] = useState(1);
   const [isOcrLoading, setIsOcrLoading] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState('');
+  const [showTopologyModal, setShowTopologyModal] = useState(false);
   const textareaRef = useRef(null);
   const lineNumbersRef = useRef(null);
 
@@ -117,6 +120,7 @@ export default function TerminalInput() {
       if (data.status === 'success' && data.topology) {
         dispatch({ type: 'SET_TOPOLOGY_NOTE', payload: data.topology });
         toast.success('Topology mapped into active property graph!');
+        setShowTopologyModal(true);
         dispatch({ 
           type: 'SET_COPILOT_PROMPT', 
           payload: "I just mapped a network topology. Please summarize the connected devices, subnets, and layers, and suggest a topology reference name." 
@@ -283,7 +287,8 @@ export default function TerminalInput() {
         </div>
 
         {/* Cisco Terminal Window */}
-        <div className="cisco-terminal-window rounded-2xl overflow-hidden shadow-2xl border border-border/90 flex flex-col">
+        <div className="cisco-terminal-window relative rounded-2xl overflow-hidden shadow-2xl border border-border/90 flex flex-col">
+          <BorderBeam rx={16} duration={12} colorFrom="#38bdf8" colorTo="#60a5fa" />
           {/* macOS / Cisco Terminal Header */}
           <div className="h-10 bg-zinc-950/80 px-4 border-b border-border/60 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -389,6 +394,12 @@ export default function TerminalInput() {
         </div>
 
       </div>
+      {showTopologyModal && (
+        <TopologyFlowView 
+          onClose={() => setShowTopologyModal(false)} 
+          hasMismatch={selectedPreset === 'CASE-001' || true} 
+        />
+      )}
     </section>
   );
 }
