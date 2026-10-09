@@ -129,11 +129,50 @@ def simulate_fallback_diagnosis(
         evidence = "Inferred from case topology and symptoms."
         layer = osi_layer
 
-    mock_fix_steps = [
-        "Review interface and VLAN configuration across affected devices",
-        "Execute corrective CLI commands matching deterministic rule recommendation",
-        "Verify state restoration with show commands and ping connectivity tests",
-    ]
+    rule_id = primary.get("rule_id", "") if findings else ""
+    if "NATIVE-MISMATCH" in rule_id:
+        mock_fix_steps = [
+            "SW1# configure terminal",
+            "SW1(config)# interface GigabitEthernet0/1",
+            "SW1(config-if)# switchport trunk native vlan 99",
+            "SW1(config-if)# end",
+            "SW1# write memory"
+        ]
+    elif "ADMIN-DOWN" in rule_id:
+        mock_fix_steps = [
+            "Router1# configure terminal",
+            "Router1(config)# interface GigabitEthernet0/1",
+            "Router1(config-if)# no shutdown",
+            "Router1(config-if)# end"
+        ]
+    elif "OSPF" in rule_id:
+        mock_fix_steps = [
+            "R2# configure terminal",
+            "R2(config)# router ospf 1",
+            "R2(config-router)# network 192.168.12.0 0.0.0.255 area 0",
+            "R2(config-router)# end"
+        ]
+    elif "ACL" in rule_id:
+        mock_fix_steps = [
+            "Router1# configure terminal",
+            "Router1(config)# ip access-list extended 101",
+            "Router1(config-ext-nacl)# no 10",
+            "Router1(config-ext-nacl)# 10 permit tcp any host 10.1.50.10 eq www",
+            "Router1(config-ext-nacl)# end"
+        ]
+    elif "TRUNK" in rule_id:
+        mock_fix_steps = [
+            "SW1# configure terminal",
+            "SW1(config)# interface GigabitEthernet0/1",
+            "SW1(config-if)# switchport mode trunk",
+            "SW1(config-if)# end"
+        ]
+    else:
+        mock_fix_steps = [
+            "Review interface and VLAN configuration across affected devices",
+            "Execute corrective CLI commands matching deterministic rule recommendation",
+            "Verify state restoration with show commands and ping connectivity tests",
+        ]
 
     estimated_output_text = f"{root_cause} {evidence} {' '.join(mock_fix_steps)}"
     word_count = len(estimated_output_text.split())
@@ -222,7 +261,7 @@ def query_local_slm(
     model_name: str = "qwen2.5-coder:3b",
     ollama_host: str = "http://localhost:11434",
     deterministic_findings: Optional[List[Dict[str, Any]]] = None,
-    timeout: float = 30.0,
+    timeout: float = 4.0,
     allow_simulation_fallback: bool = True,
 ) -> Dict[str, Any]:
     r"""Send structured prompt to local Ollama SLM and return validated JSON with native telemetry.
