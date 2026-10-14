@@ -6,9 +6,15 @@ from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
 # Ensure pytesseract can find the executable on Windows if not in PATH
 if os.name == 'nt':
-    tess_path = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-    if os.path.exists(tess_path):
-        pytesseract.pytesseract.tesseract_cmd = tess_path
+    candidates = [
+        r'C:\Program Files\Tesseract-OCR\tesseract.exe',
+        r'D:\Tesseract-OCR\tesseract.exe',
+        r'D:\sihchatbot\tesseract.exe',
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            pytesseract.pytesseract.tesseract_cmd = p
+            break
 
 def clean_and_structure_ocr_text(raw_text: str) -> str:
     """

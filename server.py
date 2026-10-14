@@ -66,7 +66,7 @@ def _prewarm_ollama_model():
     time.sleep(20.0)  # Wait for system to settle
     try:
         import requests
-        url = "http://localhost:11434/api/generate"
+        url = "http://127.0.0.1:11434/api/generate"
         payload = {
             "model": "qwen2.5-coder:3b",
             "prompt": "",  # Empty prompt
@@ -141,7 +141,7 @@ class DiagnoseRequest(BaseModel):
     severity: Optional[str] = "Medium"
     concept_tag: Optional[str] = "manual"
     model_name: Optional[str] = "qwen2.5-coder:3b"
-    ollama_host: Optional[str] = "http://localhost:11434"
+    ollama_host: Optional[str] = "http://127.0.0.1:11434"
 
 
 class ReviewRequest(BaseModel):
@@ -167,7 +167,7 @@ class ReviewRequest(BaseModel):
 def get_available_models():
     """Return list of locally installed Ollama models."""
     try:
-        r = requests.get("http://localhost:11434/api/tags", timeout=2.0)
+        r = requests.get("http://127.0.0.1:11434/api/tags", timeout=2.0)
         if r.status_code == 200:
             models = [m.get("name") for m in r.json().get("models", [])]
             return {"online": True, "models": models, "active": "qwen2.5-coder:3b" if "qwen2.5-coder:3b" in models else (models[0] if models else "mock-slm")}
@@ -248,7 +248,7 @@ def run_diagnosis(req: DiagnoseRequest):
         prompt_template=prompt_template,
         case_data=case_data,
         model_name=req.model_name or "qwen2.5-coder:3b",
-        ollama_host=req.ollama_host or "http://localhost:11434",
+        ollama_host=req.ollama_host or "http://127.0.0.1:11434",
         deterministic_findings=findings,
         allow_simulation_fallback=True,
     )
@@ -292,7 +292,7 @@ def run_diagnosis_stream(req: DiagnoseRequest):
             prompt_template=prompt_template,
             case_data=case_data,
             model_name=req.model_name or "qwen2.5-coder:3b",
-            ollama_host=req.ollama_host or "http://localhost:11434",
+            ollama_host=req.ollama_host or "http://127.0.0.1:11434",
             deterministic_findings=findings,
         )
         
@@ -311,7 +311,7 @@ class ChatRequest(BaseModel):
     context: Optional[str] = ""
     history: Optional[List[Dict[str, str]]] = []
     model_name: Optional[str] = "qwen2.5-coder:3b"
-    ollama_host: Optional[str] = "http://localhost:11434"
+    ollama_host: Optional[str] = "http://127.0.0.1:11434"
 
 
 @app.post("/api/chat/stream")
@@ -323,7 +323,7 @@ def run_chat_stream(req: ChatRequest):
             context=req.context or "",
             history=req.history or [],
             model_name=req.model_name or "qwen2.5-coder:3b",
-            ollama_host=req.ollama_host or "http://localhost:11434",
+            ollama_host=req.ollama_host or "http://127.0.0.1:11434",
         )
         for token in token_stream:
             yield f"data: {json.dumps({'type': 'token', 'token': token})}\n\n"

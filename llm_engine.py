@@ -212,7 +212,7 @@ def query_local_slm_stream(
     prompt_template: str,
     case_data: Dict[str, Any],
     model_name: str = "qwen2.5-coder:3b",
-    ollama_host: str = "http://localhost:11434",
+    ollama_host: str = "http://127.0.0.1:11434",
     deterministic_findings: Optional[List[Dict[str, Any]]] = None,
 ):
     """Generator that yields tokens from Ollama in streaming mode."""
@@ -259,7 +259,7 @@ def query_local_slm(
     prompt_template: str,
     case_data: Dict[str, Any],
     model_name: str = "qwen2.5-coder:3b",
-    ollama_host: str = "http://localhost:11434",
+    ollama_host: str = "http://127.0.0.1:11434",
     deterministic_findings: Optional[List[Dict[str, Any]]] = None,
     timeout: float = 4.0,
     allow_simulation_fallback: bool = True,
@@ -432,7 +432,7 @@ def chat_slm_stream(
     context: Optional[str] = "",
     history: Optional[List[Dict[str, str]]] = None,
     model_name: str = "qwen2.5-coder:3b",
-    ollama_host: str = "http://localhost:11434",
+    ollama_host: str = "http://127.0.0.1:11434",
 ):
     """Stream conversational Copilot response for Cisco Packet Tracer tutoring."""
     system_instruction = (
