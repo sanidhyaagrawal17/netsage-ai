@@ -1,11 +1,72 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Copy, Check, Terminal, Code2, Bot, Brain, Loader2, Sparkles, ChevronDown, ChevronRight } from 'lucide-react';
+import { 
+  Copy, Check, Terminal, Code2, Bot, Brain, Loader2, Sparkles, 
+  ChevronDown, ChevronRight, Network, ExternalLink 
+} from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
 import { useAppContext } from '../context/AppContext';
+
+function TopologyCardBlock({ language, value }) {
+  const { dispatch } = useAppContext();
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(value);
+    setCopied(true);
+    toast.success('Dynamic DSL copied to clipboard');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="my-3 rounded-2xl border border-sky-500/30 bg-gradient-to-br from-sky-950/40 via-zinc-950/90 to-black/90 p-4 shadow-xl overflow-hidden backdrop-blur-md">
+      <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-sky-400 shadow-[0_0_12px_rgba(56,189,248,0.3)]">
+            <Network size={16} />
+          </div>
+          <div>
+            <h4 className="text-xs font-bold text-foreground">
+              Dynamic Topology Digital Twin
+            </h4>
+            <span className="text-[10px] font-mono text-sky-400/80">
+              Graphviz DOT / React Flow DSL
+            </span>
+          </div>
+        </div>
+
+        <Button
+          size="sm"
+          onClick={() => dispatch({ type: 'OPEN_TOPOLOGY_MODAL' })}
+          className="h-7 px-3 text-[11px] rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 gap-1.5 shadow-sm transition-all"
+        >
+          <ExternalLink size={12} />
+          <span>Explore in Digital Twin</span>
+        </Button>
+      </div>
+
+      {/* Code Snippet */}
+      <div className="mt-3 rounded-xl border border-white/[0.06] bg-black/75 p-3 font-mono text-[11px] text-sky-300/90 max-h-40 overflow-y-auto scrollbar-mini">
+        <pre className="whitespace-pre m-0 leading-relaxed">{value}</pre>
+      </div>
+
+      {/* Action Footer */}
+      <div className="mt-2.5 pt-2 flex items-center justify-between text-[10px] font-mono text-zinc-500">
+        <span>0 MB Extra VRAM • 60 FPS Remotion Sync</span>
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1 text-zinc-400 hover:text-white transition-colors"
+        >
+          {copied ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+          <span>{copied ? 'Copied DSL' : 'Copy Code'}</span>
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function CodeBlock({ language, value }) {
   const [copied, setCopied] = useState(false);
@@ -101,10 +162,13 @@ const markdownComponents = {
   ),
   code({ node, inline, className, children, ...props }) {
     const match = /language-(\w+)/.exec(className || '');
-    const language = match ? match[1] : '';
+    const language = match ? match[1].toLowerCase() : '';
     const codeString = String(children).replace(/\n$/, '');
 
     if (!inline && (codeString.includes('\n') || language)) {
+      if (['topology', 'dot', 'graphviz'].includes(language)) {
+        return <TopologyCardBlock language={language} value={codeString} />;
+      }
       return <CodeBlock language={language || 'cisco'} value={codeString} />;
     }
 

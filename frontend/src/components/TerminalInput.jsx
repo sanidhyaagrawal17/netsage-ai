@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import BorderBeam from './ui/BorderBeam';
-import TopologyFlowView from './TopologyFlowView';
 
 const PRESET_CASES = [
   {
@@ -79,7 +78,6 @@ export default function TerminalInput() {
   const [lineCount, setLineCount] = useState(1);
   const [isOcrLoading, setIsOcrLoading] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState('');
-  const [showTopologyModal, setShowTopologyModal] = useState(false);
   const textareaRef = useRef(null);
   const lineNumbersRef = useRef(null);
 
@@ -120,7 +118,7 @@ export default function TerminalInput() {
       if (data.status === 'success' && data.topology) {
         dispatch({ type: 'SET_TOPOLOGY_NOTE', payload: data.topology });
         toast.success('Topology mapped into active property graph!');
-        setShowTopologyModal(true);
+        dispatch({ type: 'OPEN_TOPOLOGY_MODAL' });
         dispatch({ 
           type: 'SET_COPILOT_PROMPT', 
           payload: "I just mapped a network topology. Please summarize the connected devices, subnets, and layers, and suggest a topology reference name." 
@@ -410,12 +408,6 @@ export default function TerminalInput() {
         </div>
 
       </div>
-      {showTopologyModal && (
-        <TopologyFlowView 
-          onClose={() => setShowTopologyModal(false)} 
-          hasMismatch={selectedPreset === 'CASE-001' || true} 
-        />
-      )}
     </section>
   );
 }

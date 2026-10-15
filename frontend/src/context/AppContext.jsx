@@ -1,4 +1,4 @@
-﻿import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useEffect } from 'react';
 
 const AppContext = createContext();
 
@@ -71,6 +71,7 @@ const initialState = {
   isCopilotOpen: true,
   isSidebarCollapsed: false,
   isListenerRunning: false,
+  isTopologyModalOpen: false,
 };
 
 function syncSessions(sessions, activeId) {
@@ -350,6 +351,10 @@ function reducer(state, action) {
     }
     case 'SET_COPILOT_PROMPT':
       return { ...state, pendingCopilotPrompt: action.payload, isCopilotOpen: true };
+    case 'OPEN_TOPOLOGY_MODAL':
+      return { ...state, isTopologyModalOpen: true };
+    case 'CLOSE_TOPOLOGY_MODAL':
+      return { ...state, isTopologyModalOpen: false };
     default:
       return state;
   }

@@ -16,7 +16,8 @@ import {
   Pin,
   Sparkles,
   Bot,
-  Move
+  Move,
+  Network
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Button } from './ui/button';
@@ -143,6 +144,25 @@ export default function Sidebar() {
               <kbd className="px-1.5 py-0.5 rounded bg-zinc-800 text-[10px] font-mono text-zinc-400 border border-zinc-700">Ctrl K</kbd>
             )}
           </button>
+
+          {/* Digital Twin Topology Trigger */}
+          <button
+            onClick={() => dispatch({ type: 'OPEN_TOPOLOGY_MODAL' })}
+            className={cn(
+              "flex items-center w-full rounded-xl text-xs text-sky-400 hover:text-white bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/30 transition-all mb-3",
+              isCollapsed ? "justify-center h-10 px-0" : "justify-between px-3 py-2"
+            )}
+            title="Open Digital Twin Topology ($G=(V, E)$)"
+          >
+            <div className="flex items-center gap-2">
+              <Network size={15} className="text-sky-400 animate-pulse" />
+              {!isCollapsed && <span className="font-semibold">Digital Twin</span>}
+            </div>
+            {!isCollapsed && (
+              <span className="text-[9px] font-mono uppercase bg-sky-500/20 text-sky-300 px-1.5 py-0.5 rounded border border-sky-500/30">0 MB VRAM</span>
+            )}
+          </button>
+
           {navItems.map((item) => {
             const isActive = state.activeView === item.id;
             const buttonContent = (

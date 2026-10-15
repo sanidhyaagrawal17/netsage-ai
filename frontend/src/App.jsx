@@ -13,9 +13,10 @@ import { Loader2 } from 'lucide-react';
 const TelemetryView = lazy(() => import('./components/TelemetryView'));
 const HistoryView = lazy(() => import('./components/HistoryView'));
 const AuditView = lazy(() => import('./components/AuditView'));
+const TopologyFlowView = lazy(() => import('./components/TopologyFlowView'));
 
 function App() {
-  const { state } = useAppContext();
+  const { state, dispatch } = useAppContext();
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', state.theme);
@@ -37,6 +38,12 @@ function App() {
       <FloatingStatus />
       <CommandPalette />
       <Toaster position="bottom-right" theme={state.theme} />
+      
+      {state.isTopologyModalOpen && (
+        <Suspense fallback={null}>
+          <TopologyFlowView onClose={() => dispatch({ type: 'CLOSE_TOPOLOGY_MODAL' })} />
+        </Suspense>
+      )}
     </div>
   );
 }

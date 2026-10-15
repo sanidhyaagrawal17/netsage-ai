@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Button } from './ui/button';
 import { toast } from 'sonner';
@@ -10,14 +10,12 @@ import { cn } from '../lib/utils';
 import PacketFlowAnimation from './PacketFlowAnimation';
 import AiOpsScanOverlay from './AiOpsScanOverlay';
 import BorderBeam from './ui/BorderBeam';
-import TopologyFlowView from './TopologyFlowView';
 import { Network } from 'lucide-react';
 
 export default function DiagnosisView() {
   const { state, dispatch } = useAppContext();
   const diagnosis = state.diagnosis;
   const [reviewState, setReviewState] = useState(null); // 'approved' | 'rejected'
-  const [showTopologyModal, setShowTopologyModal] = useState(false);
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
@@ -205,7 +203,7 @@ ${(d.fix_steps || []).join('\n')}
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setShowTopologyModal(true)}
+                    onClick={() => dispatch({ type: 'OPEN_TOPOLOGY_MODAL' })}
                     className="h-6 px-2.5 text-[10px] font-mono gap-1 rounded-lg border-blue-500/30 text-blue-400 bg-blue-500/10 hover:bg-blue-500/20"
                   >
                     <Network size={11} /> Explore Property Graph G=(V,E)
@@ -360,12 +358,6 @@ ${(d.fix_steps || []).join('\n')}
         )}
 
       </div>
-      {showTopologyModal && (
-        <TopologyFlowView 
-          onClose={() => setShowTopologyModal(false)} 
-          hasMismatch={true} 
-        />
-      )}
     </section>
   );
 }

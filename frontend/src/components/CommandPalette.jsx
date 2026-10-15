@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Command } from 'cmdk';
 import { useAppContext } from '../context/AppContext';
 import { 
@@ -142,6 +142,19 @@ export default function CommandPalette() {
                   <span>Open Diagnosis & Packet Simulation</span>
                 </div>
                 <span className="text-[10px] font-mono text-zinc-500">View</span>
+              </Command.Item>
+
+              <Command.Item
+                onSelect={() => runAction(() => {
+                  dispatch({ type: 'OPEN_TOPOLOGY_MODAL' });
+                })}
+                className="flex items-center justify-between p-2.5 rounded-xl cursor-pointer hover:bg-white/[0.06] text-zinc-200 transition-colors"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Map size={15} className="text-sky-400" />
+                  <span>Open Digital Twin Network Topology (G=(V, E))</span>
+                </div>
+                <span className="text-[10px] font-mono text-zinc-500">Topology</span>
               </Command.Item>
 
               <Command.Item

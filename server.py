@@ -34,6 +34,10 @@ from checker import run_all_checks, extract_relevant_context
 from pt_ipc_client import fetch_topology_via_ipc
 from ocr_engine import extract_text_from_image
 from llm_engine import log_telemetry_and_audit, query_local_slm, query_local_slm_stream, chat_slm_stream
+from topology_graph import build_default_enterprise_topology, NetworkPropertyGraph, parse_topology_text_to_graph
+
+# Active Neuro-Symbolic Digital Twin Topology
+_active_topology = build_default_enterprise_topology(has_mismatch=True)
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -123,6 +127,90 @@ async def discover_topology(req: TopologyRequest):
         "status": "no_data",
         "message": "No CDP output found in terminal buffer. Paste 'show cdp neighbors' or a screenshot via Ctrl+V."
     }
+
+
+class TopologyMutationRequest(BaseModel):
+    action: str
+    id: Optional[str] = None
+    device_id: Optional[str] = None
+    type: Optional[str] = None
+    device_type: Optional[str] = None
+    ip: Optional[str] = None
+    source: Optional[str] = None
+    target: Optional[str] = None
+    dev_a: Optional[str] = None
+    dev_b: Optional[str] = None
+    intf_a: Optional[str] = None
+    intf_b: Optional[str] = None
+    status: Optional[str] = None
+    is_trunk: Optional[bool] = False
+    native_vlan: Optional[int] = 1
+
+
+class TopologyExportRequest(BaseModel):
+    image_base64: Optional[str] = None
+    dot: Optional[str] = None
+    filename: Optional[str] = None
+
+
+@app.get("/api/topology/current")
+def get_current_topology():
+    """Return active digital twin topology in React Flow JSON and Graphviz DOT formats."""
+    global _active_topology
+    reachability = _active_topology.check_l2_reachability("Host-A", "Host-B", vlan_id=10)
+    return {
+        "status": "success",
+        "react_flow": _active_topology.to_react_flow(),
+        "dot": _active_topology.to_dot(),
+        "reachability_l2": reachability,
+        "has_mismatch": not reachability.get("reachable", False),
+        "fault_label": reachability.get("reason", "All Layer-2 forwarding paths normal.")
+    }
+
+
+@app.post("/api/topology/mutate")
+def mutate_topology(req: TopologyMutationRequest):
+    """Apply dynamic AI mutation to active digital twin topology."""
+    global _active_topology
+    result = _active_topology.apply_mutation(req.dict(exclude_none=True))
+    reachability = _active_topology.check_l2_reachability("Host-A", "Host-B", vlan_id=10)
+    return {
+        "status": "success",
+        "mutation_result": result,
+        "react_flow": _active_topology.to_react_flow(),
+        "dot": _active_topology.to_dot(),
+        "reachability_l2": reachability,
+        "has_mismatch": not reachability.get("reachable", False),
+        "fault_label": reachability.get("reason", "All Layer-2 forwarding paths normal.")
+    }
+
+
+@app.post("/api/topology/export")
+def export_topology(req: TopologyExportRequest):
+    """Export network topology diagram directly to D:\\downloads\\ as vector PNG or DOT."""
+    import base64
+    export_dir = Path("D:/downloads")
+    export_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    if req.image_base64:
+        b64_str = req.image_base64
+        if "base64," in b64_str:
+            b64_str = b64_str.split("base64,")[1]
+        img_bytes = base64.b64decode(b64_str)
+        fname = req.filename or f"netsage_topology_{timestamp}.png"
+        out_path = export_dir / fname
+        out_path.write_bytes(img_bytes)
+        return {"status": "success", "file_path": str(out_path), "filename": fname}
+        
+    elif req.dot or _active_topology:
+        dot_content = req.dot or _active_topology.to_dot()
+        fname = req.filename or f"netsage_topology_{timestamp}.dot"
+        out_path = export_dir / fname
+        out_path.write_text(dot_content, encoding="utf-8")
+        return {"status": "success", "file_path": str(out_path), "filename": fname}
+        
+    return {"status": "error", "message": "No export data provided"}
 
 
 def load_prompt_template() -> str:
