@@ -68,6 +68,138 @@ function TopologyCardBlock({ language, value }) {
   );
 }
 
+function TopologyActionCardBlock({ value }) {
+  const { dispatch } = useAppContext();
+  const [executed, setExecuted] = useState(false);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [resultMsg, setResultMsg] = useState('');
+  
+  let actionData = null;
+  try {
+    actionData = JSON.parse(value);
+  } catch (e) {
+    const actionMatch = value.match(/"action":\s*"([^"]+)"/);
+    const reasonMatch = value.match(/"reason":\s*"([^"]+)"/);
+    if (actionMatch) {
+      actionData = { action: actionMatch[1], reason: reasonMatch ? reasonMatch[1] : '' };
+    }
+  }
+
+  const action = (actionData?.action || 'AUTO_HEAL').toUpperCase();
+  const reason = actionData?.reason || 'Applying topological reconfiguration to Digital Twin';
+
+  const executeMutation = async () => {
+    if (isExecuting) return;
+    setIsExecuting(true);
+    try {
+      const res = await fetch('/api/topology/mutate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ...(actionData?.params || {}) })
+      });
+      const data = await res.json();
+      if (data.status === 'success') {
+        setExecuted(true);
+        const msg = data.mutation_result?.message || `Executed mutation ${action}`;
+        setResultMsg(msg);
+        window.dispatchEvent(new CustomEvent('netsage:topology-updated', { detail: data }));
+        toast.success(`Digital Twin: ${msg}`);
+      } else {
+        toast.error(`Mutation failed: ${data.message || 'Error'}`);
+      }
+    } catch (e) {
+      toast.error(`Mutation error: ${e.message}`);
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (actionData?.action && !executed) {
+      executeMutation();
+    }
+  }, [actionData?.action]);
+
+  const isHeal = action === 'AUTO_HEAL';
+  const isFail = action === 'SIMULATE_FAIL';
+
+  return (
+    <div className={`my-3 rounded-2xl border p-4 shadow-2xl backdrop-blur-md overflow-hidden transition-all ${
+      isFail 
+        ? 'border-rose-500/40 bg-gradient-to-br from-rose-950/40 via-zinc-950/90 to-black/90 shadow-[0_0_20px_rgba(244,63,94,0.15)]' 
+        : isHeal
+        ? 'border-emerald-500/40 bg-gradient-to-br from-emerald-950/40 via-zinc-950/90 to-black/90 shadow-[0_0_20px_rgba(16,185,129,0.15)]'
+        : 'border-sky-500/40 bg-gradient-to-br from-sky-950/40 via-zinc-950/90 to-black/90 shadow-[0_0_20px_rgba(56,189,248,0.15)]'
+    }`}>
+      <div className="flex items-center justify-between pb-3 border-b border-white/[0.08]">
+        <div className="flex items-center gap-2.5">
+          <div className={`w-8 h-8 rounded-xl border flex items-center justify-center ${
+            isFail 
+              ? 'bg-rose-500/20 text-rose-400 border-rose-500/40' 
+              : isHeal
+              ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+              : 'bg-sky-500/20 text-sky-400 border-sky-500/40'
+          }`}>
+            <Sparkles size={16} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h4 className="text-xs font-bold text-foreground">
+                AI Digital Twin Reconfiguration
+              </h4>
+              <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                isFail 
+                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' 
+                  : isHeal
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                  : 'bg-sky-500/20 text-sky-300 border border-sky-500/30'
+              }`}>
+                {action}
+              </span>
+            </div>
+            <p className="text-[11px] text-zinc-400 mt-0.5">
+              {reason}
+            </p>
+          </div>
+        </div>
+
+        <Button
+          size="sm"
+          onClick={() => dispatch({ type: 'OPEN_TOPOLOGY_MODAL' })}
+          className="h-7 px-3 text-[11px] rounded-lg bg-white/10 hover:bg-white/20 text-white border border-white/20 gap-1.5 shadow-sm transition-all"
+        >
+          <ExternalLink size={12} />
+          <span>View in Digital Twin</span>
+        </Button>
+      </div>
+
+      <div className="mt-3 pt-1 flex items-center justify-between text-[11px] font-mono">
+        <div className="flex items-center gap-2">
+          {executed ? (
+            <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
+              <Check size={13} className="text-emerald-400" />
+              <span>Applied to Live Topology & Remotion Simulator</span>
+            </span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-amber-400">
+              <Loader2 size={13} className="animate-spin" />
+              <span>Applying Reconfiguration...</span>
+            </span>
+          )}
+        </div>
+
+        <button
+          onClick={executeMutation}
+          disabled={isExecuting}
+          className="text-xs text-zinc-400 hover:text-white underline underline-offset-2 transition-colors cursor-pointer"
+        >
+          {isExecuting ? 'Executing...' : 'Re-apply Mutation'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function CodeBlock({ language, value }) {
   const [copied, setCopied] = useState(false);
   const { state } = useAppContext();
@@ -166,6 +298,9 @@ const markdownComponents = {
     const codeString = String(children).replace(/\n$/, '');
 
     if (!inline && (codeString.includes('\n') || language)) {
+      if (['topology-action', 'topology_action'].includes(language)) {
+        return <TopologyActionCardBlock value={codeString} />;
+      }
       if (['topology', 'dot', 'graphviz'].includes(language)) {
         return <TopologyCardBlock language={language} value={codeString} />;
       }

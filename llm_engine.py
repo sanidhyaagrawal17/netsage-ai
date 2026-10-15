@@ -452,7 +452,23 @@ def chat_slm_stream(
         "   - Parse and reconstruct the complete network architecture.\n"
         "   - Provide an ASCII network map and a Markdown Table with: Device Name, Model/Type, Subnet / IP Range, and Connected Neighbors.\n"
         "   - Identify network layers (Core, Distribution, Access) and summarize the routing/addressing scheme.\n"
-        "7. If the user asks how to upload, map, or discover the network topology, give this EXACT advice: \"You can paste screenshot diagrams or CLI text directly via Ctrl+V, or run `show cdp neighbors` in Packet Tracer and click Discover Topology.\""
+        "7. If the user asks how to upload, map, or discover the network topology, give this EXACT advice: \"You can paste screenshot diagrams or CLI text directly via Ctrl+V, or run `show cdp neighbors` in Packet Tracer and click Discover Topology.\"\n"
+        "8. AGENTIC DIGITAL TWIN TOPOLOGY MUTATIONS:\n"
+        "   You have direct read and write control over the live Network Digital Twin ($G=(V, E, \\Phi)$) displayed in the user's workspace.\n"
+        "   When the user asks you to modify, change, fix, simulate, add devices, heal, or mutate the network topology (e.g. 'fix the VLAN mismatch', 'change the topology', 'simulate trunk failure', 'add a backup router', 'heal the network', 'reset topology'):\n"
+        "   You MUST include an executable action block with the 'topology-action' language tag:\n"
+        "   ```topology-action\n"
+        "   {\n"
+        "     \"action\": \"AUTO_HEAL\" | \"SIMULATE_FAIL\" | \"ADD_BACKUP_ROUTER\" | \"RESET\",\n"
+        "     \"reason\": \"Brief explanation of this topological change\"\n"
+        "   }\n"
+        "   ```\n"
+        "   Supported Actions:\n"
+        "   - 'AUTO_HEAL': Re-aligns trunk native VLANs to VLAN 1, resolves mismatches, and restores links to operational status.\n"
+        "   - 'SIMULATE_FAIL': Injects a core link failure / packet drop on the trunk path between switches.\n"
+        "   - 'ADD_BACKUP_ROUTER': Deploys redundant Cisco 4331 router R2-Backup with dual HSRP uplinks to SW1 and SW2.\n"
+        "   - 'RESET': Restores the baseline 4-node enterprise topology.\n"
+        "   Always accompany the action block with the corresponding Cisco IOS remediation commands so the student understands the configuration."
     )
     
     prompt_parts = [f"System: {system_instruction}"]
@@ -492,12 +508,62 @@ def chat_slm_stream(
     except Exception as exc:
         logger.warning(f"Ollama chat streaming offline/fallback ({model_name} at {endpoint}): {exc}")
         msg_lower = message.lower()
-        if "vlan" in msg_lower:
+        if "fail" in msg_lower or "simulate" in msg_lower or "drop" in msg_lower:
             fallback = (
-                "**VLAN Diagnostic Analysis:**\n\n"
-                "1. **Root Cause:** A VLAN mismatch or missing 802.1Q encapsulation prevents inter-switch packet forwarding.\n"
-                "2. **Verification:** Run `show interfaces trunk` and `show vlan brief` on both connected switches.\n"
-                "3. **Recommended Fix:** Ensure access ports are assigned to the correct VLAN (`switchport access vlan <id>`) and trunk native VLANs match on both ends."
+                "### Injected Core Trunk Failure\n\n"
+                "I have updated the live Digital Twin topology to simulate an administrative trunk shutdown on `Gi0/1` between **SW1** and **SW2**.\n\n"
+                "```cisco\n"
+                "SW1# configure terminal\n"
+                "SW1(config)# interface GigabitEthernet0/1\n"
+                "SW1(config-if)# shutdown\n"
+                "SW1(config-if)# end\n"
+                "```\n\n"
+                "```topology-action\n"
+                "{\n"
+                '  "action": "SIMULATE_FAIL",\n'
+                '  "reason": "Administrative shutdown injected on trunk link SW1 <-> SW2"\n'
+                "}\n"
+                "```\n\n"
+                "Spanning tree recalculation will now detect a link cut. Check the Remotion player to see the packet drop!"
+            )
+        elif "router" in msg_lower or "backup" in msg_lower or "hsrp" in msg_lower:
+            fallback = (
+                "### Deployed Redundant Default Gateway (HSRP)\n\n"
+                "I have provisioned a redundant Cisco 4331 router **R2-Backup** with dual uplinks to provide high-availability transit for both switches.\n\n"
+                "```cisco\n"
+                "R2-Backup# configure terminal\n"
+                "R2-Backup(config)# interface GigabitEthernet0/0/0\n"
+                "R2-Backup(config-if)# ip address 10.1.10.254 255.255.255.0\n"
+                "R2-Backup(config-if)# standby 10 ip 10.1.10.1\n"
+                "R2-Backup(config-if)# standby 10 priority 110\n"
+                "R2-Backup(config-if)# no shutdown\n"
+                "```\n\n"
+                "```topology-action\n"
+                "{\n"
+                '  "action": "ADD_BACKUP_ROUTER",\n'
+                '  "reason": "Deployed R2-Backup with dual HSRP uplinks to SW1 and SW2"\n'
+                "}\n"
+                "```\n\n"
+                "The Digital Twin topology has been updated with R2-Backup."
+            )
+        elif "fix" in msg_lower or "heal" in msg_lower or ("vlan" in msg_lower and ("mismatch" in msg_lower or "trunk" in msg_lower)):
+            fallback = (
+                "### Auto-Healing Native VLAN Mismatch\n\n"
+                "I have synchronized the 802.1Q trunk native VLAN on `GigabitEthernet0/1` across both switches back to standard **VLAN 1**.\n\n"
+                "```cisco\n"
+                "SW2# configure terminal\n"
+                "SW2(config)# interface GigabitEthernet0/1\n"
+                "SW2(config-if)# switchport trunk native vlan 1\n"
+                "SW2(config-if)# end\n"
+                "SW2# write memory\n"
+                "```\n\n"
+                "```topology-action\n"
+                "{\n"
+                '  "action": "AUTO_HEAL",\n'
+                '  "reason": "Synchronized trunk native VLAN to 1, restoring Layer-2 spanning tree forwarding."\n'
+                "}\n"
+                "```\n\n"
+                "The Layer-2 forwarding path between Host-A and Host-B is now fully restored."
             )
         elif "ospf" in msg_lower or "routing" in msg_lower:
             fallback = (

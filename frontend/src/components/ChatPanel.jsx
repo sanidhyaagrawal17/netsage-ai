@@ -135,10 +135,10 @@ export default function ChatPanel() {
   }, [width, state.isSidebarCollapsed]);
 
   const quickPrompts = [
-    "Explain native VLAN mismatch simply",
-    "Why does OSPF get stuck in EXSTART?",
-    "What Cisco show command should I run next?",
-    "How does an inverted wildcard mask cause ACL drops?"
+    "Fix native VLAN mismatch in Digital Twin",
+    "Simulate core trunk failure in Digital Twin",
+    "Deploy redundant backup router R2 (HSRP)",
+    "Explain native VLAN mismatch simply"
   ];
 
   const stopGeneration = () => {

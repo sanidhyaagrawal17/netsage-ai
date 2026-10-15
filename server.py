@@ -404,11 +404,42 @@ class ChatRequest(BaseModel):
 
 @app.post("/api/chat/stream")
 def run_chat_stream(req: ChatRequest):
-    """Stream conversational Copilot assistance via SSE."""
+    """Stream conversational Copilot assistance via SSE with live Digital Twin awareness."""
+    global _active_topology
+    enriched_context = req.context or ""
+    
+    if _active_topology:
+        reachability = _active_topology.check_l2_reachability("Host-A", "Host-B", vlan_id=10)
+        devs = []
+        for n, d in _active_topology.graph.nodes(data=True):
+            if d.get("node_type") == "device":
+                intfs = _active_topology.device_interfaces.get(n, {})
+                intf_strs = [
+                    f"{k} (IP: {v.get('ip') or 'None'}, Trunk: {v.get('is_trunk')}, VLAN: {v.get('native_vlan', 1) if v.get('is_trunk') else v.get('vlan', 1)})"
+                    for k, v in intfs.items()
+                ]
+                devs.append(f"- {n} [{d.get('device_type', 'Device')}]: {', '.join(intf_strs) if intf_strs else 'Active'}")
+
+        links = []
+        for u, v, ed in _active_topology.graph.edges(data=True):
+            if ed.get("relation") == "physical_link":
+                st = ed.get("status", "up")
+                links.append(f"- {u} <-> {v}: status={st}, trunk={ed.get('is_trunk', False)}, native_vlan={ed.get('native_vlan', 1)}")
+
+        topo_summary = (
+            "\n\n[LIVE DIGITAL TWIN TOPOLOGY STATE G=(V,E)]\n"
+            "Devices in active network:\n" + "\n".join(devs) + "\n"
+            "Physical & Trunk Links:\n" + "\n".join(links) + "\n"
+            f"Layer-2 Host-A <-> Host-B Reachability: {'REACHABLE' if reachability.get('reachable') else 'BROKEN / CUT-SET ANOMALY'}\n"
+            f"Topology Anomaly: {reachability.get('reason', 'All paths operational')}\n"
+            "=========================================\n"
+        )
+        enriched_context += topo_summary
+
     def generate_chat_events():
         token_stream = chat_slm_stream(
             message=req.message,
-            context=req.context or "",
+            context=enriched_context,
             history=req.history or [],
             model_name=req.model_name or "qwen2.5-coder:3b",
             ollama_host=req.ollama_host or "http://127.0.0.1:11434",

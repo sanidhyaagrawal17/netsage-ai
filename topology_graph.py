@@ -428,6 +428,7 @@ class NetworkPropertyGraph:
                 "id": edge_key,
                 "source": u_id,
                 "target": v_id,
+                "type": "ciscoEdge",
                 "animated": status == "up",
                 "label": edge_label,
                 "labelStyle": {
@@ -436,10 +437,18 @@ class NetworkPropertyGraph:
                     "fontSize": 10,
                     "fontFamily": "monospace"
                 },
+                "labelBgStyle": {
+                    "fill": "#090d16",
+                    "fillOpacity": 0.95,
+                    "stroke": stroke_color,
+                    "strokeWidth": 1.5
+                },
+                "labelBgPadding": [6, 12],
+                "labelBgBorderRadius": 8,
                 "style": {
                     "stroke": stroke_color,
                     "strokeWidth": 3 if (is_down or is_mismatch) else 2,
-                    "strokeDasharray": "6,4" if (is_down or is_mismatch) else "none"
+                    "strokeDasharray": "8,6" if is_down else ("6,4" if is_mismatch else "none")
                 },
                 "data": edata
             })

@@ -7,7 +7,10 @@ import {
   useNodesState, 
   useEdgesState,
   Handle,
-  Position
+  Position,
+  BaseEdge,
+  getSmoothStepPath,
+  EdgeLabelRenderer
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { 
@@ -22,12 +25,90 @@ import { Button } from './ui/button';
 import { toast } from 'sonner';
 
 // ==========================================
-// 1. CUSTOM CISCO REACT FLOW NODES
+// 1. SLEEK CISCO CUSTOM EDGE COMPONENT
+// ==========================================
+function CiscoEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  style = {},
+  data,
+  label,
+  markerEnd,
+}) {
+  const [edgePath, labelX, labelY] = getSmoothStepPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+    borderRadius: 16,
+  });
+
+  const isDown = data?.status === 'down' || style?.stroke === '#f43f5e' || (typeof label === 'string' && label.includes('DOWN'));
+  const isMismatch = data?.status === 'mismatch' || style?.stroke === '#fbbf24' || (typeof label === 'string' && label.includes('MISMATCH'));
+
+  let strokeColor = '#38bdf8';
+  if (isDown) strokeColor = '#f43f5e';
+  else if (isMismatch) strokeColor = '#f59e0b';
+
+  return (
+    <>
+      <BaseEdge
+        path={edgePath}
+        markerEnd={markerEnd}
+        style={{
+          ...style,
+          stroke: strokeColor,
+          strokeWidth: isDown || isMismatch ? 3 : 2,
+          strokeDasharray: isDown ? '8,6' : (isMismatch ? '6,4' : 'none'),
+        }}
+      />
+      {label && (
+        <EdgeLabelRenderer>
+          <div
+            style={{
+              position: 'absolute',
+              transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+              pointerEvents: 'all',
+            }}
+            className={`nodrag nopan px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold tracking-wide border shadow-2xl backdrop-blur-xl flex items-center gap-1.5 select-none transition-all ${
+              isDown
+                ? 'bg-[#0f0408]/95 text-rose-300 border-rose-500/50 shadow-[0_0_15px_rgba(244,63,94,0.35)]'
+                : isMismatch
+                ? 'bg-[#140f04]/95 text-amber-300 border-amber-500/50 shadow-[0_0_15px_rgba(245,158,11,0.35)]'
+                : 'bg-[#060b14]/95 text-sky-300 border-sky-500/40 shadow-[0_0_15px_rgba(56,189,248,0.25)]'
+            }`}
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                isDown ? 'bg-rose-500 animate-ping' : isMismatch ? 'bg-amber-400 animate-ping' : 'bg-sky-400'
+              }`}
+            />
+            <span>{label}</span>
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </>
+  );
+}
+
+// ==========================================
+// 2. CUSTOM CISCO REACT FLOW NODES
 // ==========================================
 function CiscoRouterNode({ data, selected }) {
   return (
     <div className={`px-4 py-3 rounded-2xl glass-card border transition-all ${selected ? 'border-cyan-400 shadow-[0_0_20px_rgba(56,189,248,0.4)]' : 'border-border/80'} bg-zinc-950/95 min-w-[150px]`}>
-      <Handle type="target" position={Position.Left} className="w-2.5 h-2.5 bg-cyan-400 border border-black" />
+      <Handle 
+        type="target" 
+        position={Position.Left} 
+        className="!w-2.5 !h-2.5 !bg-zinc-950 !border-2 !border-cyan-400 !rounded-full shadow-[0_0_8px_rgba(56,189,248,0.8)] !-left-1.5 transition-transform hover:scale-125" 
+      />
       <div className="flex items-center gap-2.5">
         <div className="w-8 h-8 rounded-xl bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-[0_0_10px_rgba(56,189,248,0.2)]">
           <Network size={16} />
@@ -41,7 +122,11 @@ function CiscoRouterNode({ data, selected }) {
         <span className="text-cyan-400 font-semibold">{data.ip || '192.168.1.1'}</span>
         <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse" />
       </div>
-      <Handle type="source" position={Position.Right} className="w-2.5 h-2.5 bg-cyan-400 border border-black" />
+      <Handle 
+        type="source" 
+        position={Position.Right} 
+        className="!w-2.5 !h-2.5 !bg-zinc-950 !border-2 !border-cyan-400 !rounded-full shadow-[0_0_8px_rgba(56,189,248,0.8)] !-right-1.5 transition-transform hover:scale-125" 
+      />
     </div>
   );
 }
@@ -50,7 +135,11 @@ function CiscoSwitchNode({ data, selected }) {
   const isMismatch = data.isMismatch;
   return (
     <div className={`px-4 py-3 rounded-2xl glass-card border transition-all ${isMismatch ? 'border-rose-500 shadow-[0_0_25px_rgba(244,63,94,0.4)]' : selected ? 'border-blue-400 shadow-[0_0_20px_rgba(96,165,250,0.4)]' : 'border-border/80'} bg-zinc-950/95 min-w-[150px]`}>
-      <Handle type="target" position={Position.Left} className="w-2.5 h-2.5 bg-blue-400 border border-black" />
+      <Handle 
+        type="target" 
+        position={Position.Left} 
+        className={`!w-2.5 !h-2.5 !bg-zinc-950 !border-2 ${isMismatch ? '!border-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]' : '!border-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]'} !rounded-full !-left-1.5 transition-transform hover:scale-125`} 
+      />
       <div className="flex items-center gap-2.5">
         <div className={`w-8 h-8 rounded-xl ${isMismatch ? 'bg-rose-500/20 text-rose-400 border-rose-500/40 shadow-[0_0_12px_rgba(244,63,94,0.3)]' : 'bg-blue-500/15 text-blue-400 border-blue-500/30'} border flex items-center justify-center`}>
           <Server size={16} />
@@ -66,7 +155,11 @@ function CiscoSwitchNode({ data, selected }) {
         </span>
         <span className={`w-2 h-2 rounded-full ${isMismatch ? 'bg-rose-500 shadow-[0_0_8px_#f43f5e] animate-ping' : 'bg-emerald-400 shadow-[0_0_8px_#34d399]'}`} />
       </div>
-      <Handle type="source" position={Position.Right} className="w-2.5 h-2.5 bg-blue-400 border border-black" />
+      <Handle 
+        type="source" 
+        position={Position.Right} 
+        className={`!w-2.5 !h-2.5 !bg-zinc-950 !border-2 ${isMismatch ? '!border-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.8)]' : '!border-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]'} !rounded-full !-right-1.5 transition-transform hover:scale-125`} 
+      />
     </div>
   );
 }
@@ -74,7 +167,11 @@ function CiscoSwitchNode({ data, selected }) {
 function CiscoHostNode({ data, selected }) {
   return (
     <div className={`px-4 py-3 rounded-2xl glass-card border transition-all ${selected ? 'border-emerald-400 shadow-[0_0_20px_rgba(16,185,129,0.4)]' : 'border-border/80'} bg-zinc-950/95 min-w-[140px]`}>
-      <Handle type="target" position={Position.Left} className="w-2.5 h-2.5 bg-emerald-400 border border-black" />
+      <Handle 
+        type="target" 
+        position={Position.Left} 
+        className="!w-2.5 !h-2.5 !bg-zinc-950 !border-2 !border-emerald-400 !rounded-full shadow-[0_0_8px_rgba(52,211,153,0.8)] !-left-1.5 transition-transform hover:scale-125" 
+      />
       <div className="flex items-center gap-2.5">
         <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.2)]">
           <Laptop size={16} />
@@ -88,7 +185,11 @@ function CiscoHostNode({ data, selected }) {
         <span className="text-emerald-400 font-semibold">{data.ip || '10.1.10.5'}</span>
         <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
       </div>
-      <Handle type="source" position={Position.Right} className="w-2.5 h-2.5 bg-emerald-400 border border-black" />
+      <Handle 
+        type="source" 
+        position={Position.Right} 
+        className="!w-2.5 !h-2.5 !bg-zinc-950 !border-2 !border-emerald-400 !rounded-full shadow-[0_0_8px_rgba(52,211,153,0.8)] !-right-1.5 transition-transform hover:scale-125" 
+      />
     </div>
   );
 }
@@ -97,6 +198,11 @@ const nodeTypes = {
   ciscoRouter: CiscoRouterNode,
   ciscoSwitch: CiscoSwitchNode,
   ciscoHost: CiscoHostNode
+};
+
+const edgeTypes = {
+  ciscoEdge: CiscoEdge,
+  default: CiscoEdge
 };
 
 // ==========================================
@@ -178,16 +284,18 @@ export default function TopologyFlowView({ onClose, hasMismatch: initialMismatch
       id: 'e-host-a-sw1',
       source: 'host-a',
       target: 'sw1',
+      type: 'ciscoEdge',
       animated: true,
+      label: 'Fa0/2 Access (VLAN 10)',
       style: { stroke: '#38bdf8', strokeWidth: 2 }
     },
     {
       id: 'e-sw1-sw2',
       source: 'sw1',
       target: 'sw2',
+      type: 'ciscoEdge',
       animated: true,
       label: initialMismatch ? 'TRUNK MISMATCH (VLAN 1 vs 99)' : '802.1Q TRUNK (OK)',
-      labelStyle: { fill: initialMismatch ? '#fbbf24' : '#38bdf8', fontWeight: 700, fontSize: 10, fontFamily: 'monospace' },
       style: { 
         stroke: initialMismatch ? '#fbbf24' : '#38bdf8', 
         strokeWidth: 3, 
@@ -198,7 +306,9 @@ export default function TopologyFlowView({ onClose, hasMismatch: initialMismatch
       id: 'e-sw2-host-b',
       source: 'sw2',
       target: 'host-b',
+      type: 'ciscoEdge',
       animated: !initialMismatch,
+      label: 'Fa0/2 Access (VLAN 10)',
       style: { stroke: initialMismatch ? '#64748b' : '#10b981', strokeWidth: 2 }
     }
   ], [initialMismatch]);
@@ -232,6 +342,26 @@ export default function TopologyFlowView({ onClose, hasMismatch: initialMismatch
     fetchCurrentTopology();
   }, [fetchCurrentTopology]);
 
+  // Listen for real-time AI topology mutation events from Copilot Chat
+  useEffect(() => {
+    const handleRemoteUpdate = (e) => {
+      if (e.detail) {
+        if (e.detail.react_flow) {
+          setNodes(e.detail.react_flow.nodes || []);
+          setEdges(e.detail.react_flow.edges || []);
+        }
+        if (e.detail.dot) setDotCode(e.detail.dot);
+        if (e.detail.reachability_l2) setReachability(e.detail.reachability_l2);
+        setHasMismatch(!!e.detail.has_mismatch);
+        if (e.detail.fault_label) setFaultLabel(e.detail.fault_label);
+      } else {
+        fetchCurrentTopology();
+      }
+    };
+    window.addEventListener('netsage:topology-updated', handleRemoteUpdate);
+    return () => window.removeEventListener('netsage:topology-updated', handleRemoteUpdate);
+  }, [fetchCurrentTopology, setNodes, setEdges]);
+
   // Handle dynamic AI mutation
   const handleMutation = async (action, extraPayload = {}) => {
     try {
@@ -253,6 +383,8 @@ export default function TopologyFlowView({ onClose, hasMismatch: initialMismatch
         setHasMismatch(!!data.has_mismatch);
         if (data.fault_label) setFaultLabel(data.fault_label);
         
+        // Broadcast to other components (e.g. Chat or Remotion)
+        window.dispatchEvent(new CustomEvent('netsage:topology-updated', { detail: data }));
         toast.success(data.mutation_result?.message || `Executed mutation: ${action}`);
       } else {
         toast.error(`Mutation failed: ${data.message || 'Unknown error'}`);
@@ -583,6 +715,7 @@ export default function TopologyFlowView({ onClose, hasMismatch: initialMismatch
             onEdgesChange={onEdgesChange}
             onNodeClick={onNodeClick}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             fitView
             className="bg-[#07090e]"
           >
