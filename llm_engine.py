@@ -261,7 +261,7 @@ def query_local_slm(
     model_name: str = "qwen2.5-coder:3b",
     ollama_host: str = "http://127.0.0.1:11434",
     deterministic_findings: Optional[List[Dict[str, Any]]] = None,
-    timeout: float = 4.0,
+    timeout: float = 45.0,
     allow_simulation_fallback: bool = True,
 ) -> Dict[str, Any]:
     r"""Send structured prompt to local Ollama SLM and return validated JSON with native telemetry.
@@ -289,7 +289,7 @@ def query_local_slm(
     start_time = time.perf_counter()
 
     try:
-        response = requests.post(endpoint, json=payload, timeout=(2.0, timeout))
+        response = requests.post(endpoint, json=payload, timeout=(5.0, timeout))
         response.raise_for_status()
         end_time = time.perf_counter()
 
