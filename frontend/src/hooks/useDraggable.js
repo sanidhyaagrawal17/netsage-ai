@@ -1,21 +1,26 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 export function useDraggable(storageKey, defaultPosition = { x: 24, y: 24 }) {
+  const actualKey = typeof storageKey === 'string' ? storageKey : 'netsage_floating_status_pos';
+  const initialPos = typeof storageKey === 'object' && storageKey !== null 
+    ? storageKey 
+    : (defaultPosition || { x: 24, y: 24 });
+
   const [position, setPosition] = useState(() => {
-    if (typeof window === 'undefined') return defaultPosition;
-    const saved = localStorage.getItem(storageKey);
-    if (saved) {
-      try {
+    if (typeof window === 'undefined') return initialPos;
+    try {
+      const saved = localStorage.getItem(actualKey);
+      if (saved) {
         const parsed = JSON.parse(saved);
-        if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+        if (Number.isFinite(parsed?.x) && Number.isFinite(parsed?.y)) {
           // Verify bounds so it's not off-screen
           const x = Math.min(Math.max(10, parsed.x), window.innerWidth - 60);
           const y = Math.min(Math.max(10, parsed.y), window.innerHeight - 60);
           return { x, y };
         }
-      } catch (e) {}
-    }
-    return defaultPosition;
+      }
+    } catch (e) {}
+    return initialPos;
   });
 
   const [isDragging, setIsDragging] = useState(false);
@@ -31,15 +36,18 @@ export function useDraggable(storageKey, defaultPosition = { x: 24, y: 24 }) {
     let clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
     let clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
 
+    const curX = Number.isFinite(position?.x) ? position.x : initialPos.x;
+    const curY = Number.isFinite(position?.y) ? position.y : initialPos.y;
+
     dragStartPos.current = { x: clientX, y: clientY };
     hasMoved.current = false;
 
     dragOffset.current = {
-      x: clientX - position.x,
-      y: clientY - position.y
+      x: clientX - curX,
+      y: clientY - curY
     };
     setIsDragging(true);
-  }, [position]);
+  }, [position, initialPos]);
 
   const handlePointerMove = useCallback((e) => {
     if (!isDragging) return;

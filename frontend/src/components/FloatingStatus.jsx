@@ -43,29 +43,20 @@ export default function FloatingStatus() {
       setActiveTimer(0);
       setFlavorText('');
     }
-    // Smooth animation variants
-  const pillVariants = {
-    initial: { scale: 0.92, opacity: 0 },
-    animate: { scale: 1, opacity: 1 },
-    exit: { scale: 0.92, opacity: 0 }
-  };
 
-  const expandedVariants = {
-    initial: { scale: 0.92, opacity: 0 },
-    animate: { scale: 1, opacity: 1 },
-    exit: { scale: 0.92, opacity: 0 }
-  };
-
-  const transitionConfig = { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] };
-
-  return () => clearInterval(interval);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [state.aiStatus]);
 
   const pipContainerRef = useRef(null);
 
   // Position for floating widget
-  const defaultPos = { x: window.innerWidth - 380, y: 30 };
-  const { position, isDragging, handlePointerDown } = useDraggable(defaultPos);
+  const defaultPos = { 
+    x: typeof window !== 'undefined' ? Math.max(20, window.innerWidth - 380) : 100, 
+    y: 30 
+  };
+  const { position, isDragging, handlePointerDown } = useDraggable('netsage_floating_status_pos', defaultPos);
 
 
 
@@ -244,7 +235,7 @@ export default function FloatingStatus() {
           isDragging ? "cursor-grabbing" : "transition-transform duration-150 ease-out"
         )}
         style={{ 
-          transform: `translate(${position.x}px, ${position.y}px)`,
+          transform: `translate(${Number.isFinite(position?.x) ? position.x : defaultPos.x}px, ${Number.isFinite(position?.y) ? position.y : defaultPos.y}px)`,
           touchAction: 'none'
         }}
       >

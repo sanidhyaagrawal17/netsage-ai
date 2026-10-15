@@ -28,10 +28,37 @@ export default function MiniCopilotChat({ isPiP = false }) {
   const [editText, setEditText] = useState('');
 
   
+  const handlePaste = async (e) => {
+    if (e.clipboardData?.files && e.clipboardData.files.length > 0) {
+      const file = e.clipboardData.files[0];
+      if (file.type.startsWith('image/')) {
+        e.preventDefault();
+        setIsOcrLoading(true);
+        toast.info('Extracting network topology & CLI from image...');
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+          const res = await fetch('/api/ocr', { method: 'POST', body: formData });
+          const json = await res.json();
+          if (json.success) {
+            setInputMessage((prev) => (prev ? prev + '\n\n' : '') + json.text);
+            toast.success('Visual OCR Transcription Successful');
+          } else {
+            toast.error(json.text || 'OCR Extraction Failed');
+          }
+        } catch (err) {
+          toast.error('Network error during OCR');
+        } finally {
+          setIsOcrLoading(false);
+        }
+      }
+    }
+  };
+
   // Auto-trigger copilot from global state
   useEffect(() => {
     if (state.pendingCopilotPrompt && !isStreaming) {
-      handleSendMessage(state.pendingCopilotPrompt);
+      sendMessage(state.pendingCopilotPrompt);
       dispatch({ type: 'SET_COPILOT_PROMPT', payload: null });
     }
   }, [state.pendingCopilotPrompt, isStreaming]);
@@ -83,7 +110,7 @@ export default function MiniCopilotChat({ isPiP = false }) {
     if (!query || !query.trim() || isStreaming) return;
 
     if (!isBranch) {
-      if (typeof overrideMsg !== 'string') setInputMessage('');
+      setInputMessage('');
     }
     isAutoScrollEnabled.current = true;
 

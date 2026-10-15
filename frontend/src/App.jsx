@@ -5,6 +5,7 @@ import DiagnosisView from './components/DiagnosisView';
 import ChatPanel from './components/ChatPanel';
 import FloatingStatus from './components/FloatingStatus';
 import CommandPalette from './components/CommandPalette';
+import ErrorBoundary from './components/ErrorBoundary';
 import { useAppContext } from './context/AppContext';
 import { Toaster } from './components/ui/sonner';
 import { Loader2 } from 'lucide-react';
@@ -35,13 +36,17 @@ function App() {
         </Suspense>
       </main>
       <ChatPanel />
-      <FloatingStatus />
+      <ErrorBoundary title="Mini Copilot Widget">
+        <FloatingStatus />
+      </ErrorBoundary>
       <CommandPalette />
       <Toaster position="bottom-right" theme={state.theme} />
       
       {state.isTopologyModalOpen && (
         <Suspense fallback={null}>
-          <TopologyFlowView onClose={() => dispatch({ type: 'CLOSE_TOPOLOGY_MODAL' })} />
+          <ErrorBoundary title="Digital Twin Canvas">
+            <TopologyFlowView onClose={() => dispatch({ type: 'CLOSE_TOPOLOGY_MODAL' })} />
+          </ErrorBoundary>
         </Suspense>
       )}
     </div>
