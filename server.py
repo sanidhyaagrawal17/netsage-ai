@@ -526,6 +526,8 @@ def get_benchmarks():
 # Mount static files and root fallback
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+    if (STATIC_DIR / "assets").exists():
+        app.mount("/assets", StaticFiles(directory=str(STATIC_DIR / "assets")), name="assets")
 
 
 
@@ -585,6 +587,14 @@ def serve_index():
     if index_path.exists():
         return FileResponse(str(index_path))
     return JSONResponse({"status": "NetSage AI Backend Live", "docs": "/docs"})
+
+
+@app.get("/favicon.ico")
+def serve_favicon():
+    fav = STATIC_DIR / "favicon.ico"
+    if fav.exists():
+        return FileResponse(str(fav))
+    return JSONResponse(status_code=404, content={"detail": "Not found"})
 
 
 if __name__ == "__main__":

@@ -51,12 +51,25 @@ export default function FloatingStatus() {
 
   const pipContainerRef = useRef(null);
 
-  // Position for floating widget
   const defaultPos = { 
     x: typeof window !== 'undefined' ? Math.max(20, window.innerWidth - 380) : 100, 
     y: 30 
   };
-  const { position, isDragging, handlePointerDown } = useDraggable('netsage_floating_status_pos', defaultPos);
+  const { position, setPosition, isDragging, handlePointerDown, wasDragged } = useDraggable('netsage_floating_status_pos', defaultPos);
+
+  const handleExpand = () => {
+    if (wasDragged()) return;
+    const curX = Number.isFinite(position?.x) ? position.x : defaultPos.x;
+    const curY = Number.isFinite(position?.y) ? position.y : defaultPos.y;
+    const maxX = Math.max(12, window.innerWidth - size.width - 16);
+    const maxY = Math.max(12, window.innerHeight - size.height - 16);
+    const targetX = Math.min(Math.max(12, curX), maxX);
+    const targetY = Math.min(Math.max(12, curY), maxY);
+    if (targetX !== curX || targetY !== curY) {
+      setPosition({ x: targetX, y: targetY });
+    }
+    setIsExpanded(true);
+  };
 
 
 
@@ -175,19 +188,31 @@ export default function FloatingStatus() {
     const startW = size.width;
     const startH = size.height;
 
+    let resizeAnimFrame = null;
+    let latestX = startX;
+    let latestY = startY;
+
     const onMouseMove = (moveEvent) => {
-      const newW = Math.max(300, Math.min(600, startW + (moveEvent.clientX - startX)));
-      const newH = Math.max(350, Math.min(750, startH + (moveEvent.clientY - startY)));
-      setSize({ width: newW, height: newH });
+      latestX = moveEvent.clientX;
+      latestY = moveEvent.clientY;
+
+      if (resizeAnimFrame) return;
+      resizeAnimFrame = requestAnimationFrame(() => {
+        const newW = Math.max(300, Math.min(window.innerWidth - 30, startW + (latestX - startX)));
+        const newH = Math.max(350, Math.min(window.innerHeight - 30, startH + (latestY - startY)));
+        setSize({ width: newW, height: newH });
+        resizeAnimFrame = null;
+      });
     };
 
     const onMouseUp = () => {
+      if (resizeAnimFrame) cancelAnimationFrame(resizeAnimFrame);
       setIsResizingWindow(false);
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
     };
 
-    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mousemove', onMouseMove, { passive: true });
     window.addEventListener('mouseup', onMouseUp);
   };
 
@@ -231,11 +256,12 @@ export default function FloatingStatus() {
       <div 
         id="floating-status-widget"
         className={cn(
-          "fixed top-0 left-0 z-50",
-          isDragging ? "cursor-grabbing" : "transition-transform duration-150 ease-out"
+          "fixed top-0 left-0 z-50 select-none",
+          isDragging ? "cursor-grabbing" : "cursor-grab"
         )}
         style={{ 
-          transform: `translate(${Number.isFinite(position?.x) ? position.x : defaultPos.x}px, ${Number.isFinite(position?.y) ? position.y : defaultPos.y}px)`,
+          transform: `translate3d(${Number.isFinite(position?.x) ? position.x : defaultPos.x}px, ${Number.isFinite(position?.y) ? position.y : defaultPos.y}px, 0)`,
+          transition: isDragging ? 'none' : 'transform 0.15s cubic-bezier(0.16, 1, 0.3, 1)',
           touchAction: 'none'
         }}
       >
@@ -324,7 +350,7 @@ export default function FloatingStatus() {
               </div>
 
               {/* Chat Body with min-h-0 */}
-              <div className="min-h-0 h-full overflow-hidden">
+              <div className="min-h-0 h-full overflow-hidden" data-no-drag="true">
                 <MiniCopilotChat />
               </div>
 
@@ -349,17 +375,22 @@ export default function FloatingStatus() {
               exit="exit"
               transition={transitionConfig}
               className={cn(
-                "flex items-center gap-2.5 px-3.5 py-2 glass-pill rounded-full transition-colors duration-150 shadow-2xl",
+                "flex items-center gap-2.5 px-3.5 py-2 glass-pill rounded-full transition-colors duration-150 shadow-2xl select-none",
                 "hover:border-border",
-                isDragging ? "cursor-grabbing scale-105" : "cursor-grab"
+                isDragging ? "cursor-grabbing scale-[1.02] shadow-primary/25" : "cursor-pointer"
               )}
-              onClick={() => !isDragging && setIsExpanded(true)}
+              onClick={handleExpand}
               onDoubleClick={handleDockToSidebar}
               onMouseDown={handlePointerDown}
               onTouchStart={handlePointerDown}
-              title="Click to open Mini Copilot · Double click to Dock"
+              title="Click to open Mini Copilot · Drag to move · Double click to Dock"
             >
-              <GripVertical size={13} className="text-muted-foreground opacity-60" />
+              <div 
+                className="cursor-grab active:cursor-grabbing p-0.5 -ml-1 text-muted-foreground hover:text-foreground transition-colors"
+                title="Drag widget"
+              >
+                <GripVertical size={13} />
+              </div>
               <span className={cn("w-2 h-2 rounded-full", currentConfig.color, currentConfig.glow)} />
               
               <div className="flex items-center gap-2">

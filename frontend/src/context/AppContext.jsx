@@ -56,8 +56,13 @@ const initialState = {
   theme: localStorage.getItem('netsage_theme') || 'dark',
   liveStatus: { active: false, text: 'Standby' },
   backendConnected: true,
-  isCopilotStreaming: false,
-  isPillDocked: true,
+  isPillDocked: (() => {
+    try {
+      const saved = localStorage.getItem('netsage_pill_docked');
+      if (saved !== null) return JSON.parse(saved);
+    } catch (e) {}
+    return false; // Default to floating so users see the copilot widget immediately
+  })(),
   aiStatus: 'idle', // 'idle' | 'rules' | 'thinking' | 'streaming' | 'offline'
   diagnosis: null,
   streamedRaw: '',
@@ -120,9 +125,12 @@ function reducer(state, action) {
     case 'SET_COPILOT_STREAMING':
       return { ...state, isCopilotStreaming: action.payload };
     case 'SET_PILL_DOCKED':
+      try { localStorage.setItem('netsage_pill_docked', JSON.stringify(action.payload)); } catch (e) {}
       return { ...state, isPillDocked: action.payload };
     case 'TOGGLE_PILL_DOCK':
-      return { ...state, isPillDocked: !state.isPillDocked };
+      const nextDockState = !state.isPillDocked;
+      try { localStorage.setItem('netsage_pill_docked', JSON.stringify(nextDockState)); } catch (e) {}
+      return { ...state, isPillDocked: nextDockState };
     case 'SET_AI_STATUS':
       return { ...state, aiStatus: action.payload };
     case 'SET_DIAGNOSIS':
