@@ -145,6 +145,11 @@ class TopologyMutationRequest(BaseModel):
     status: Optional[str] = None
     is_trunk: Optional[bool] = False
     native_vlan: Optional[int] = 1
+    x: Optional[float] = None
+    y: Optional[float] = None
+    nodes: Optional[List[Dict[str, Any]]] = None
+    links: Optional[List[Dict[str, Any]]] = None
+    layout: Optional[str] = "hierarchical"
 
 
 class TopologyExportRequest(BaseModel):

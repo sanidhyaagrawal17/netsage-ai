@@ -92,10 +92,17 @@ function TopologyActionCardBlock({ value }) {
     if (isExecuting) return;
     setIsExecuting(true);
     try {
+      const payload = {
+        action,
+        ...(actionData?.params || {}),
+        ...(actionData?.nodes ? { nodes: actionData.nodes } : {}),
+        ...(actionData?.links ? { links: actionData.links } : {}),
+        ...(actionData?.layout ? { layout: actionData.layout } : {})
+      };
       const res = await fetch('/api/topology/mutate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, ...(actionData?.params || {}) })
+        body: JSON.stringify(payload)
       });
       const data = await res.json();
       if (data.status === 'success') {

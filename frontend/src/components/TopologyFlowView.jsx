@@ -1,11 +1,14 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { 
   ReactFlow, 
+  ReactFlowProvider,
+  useReactFlow,
   Background, 
   Controls, 
   MiniMap, 
   useNodesState, 
   useEdgesState,
+  addEdge,
   Handle,
   Position,
   BaseEdge,
@@ -17,7 +20,8 @@ import {
   Network, Server, Laptop, ShieldAlert, CheckCircle2, 
   Info, X, Layers, Cpu, Activity, ArrowRight, Sparkles,
   Download, Code2, RotateCcw, PlusCircle, Flame, Copy,
-  Check, ChevronDown, ChevronUp, Play, FileCode, CheckCheck
+  Check, ChevronDown, ChevronUp, Play, FileCode, CheckCheck,
+  Database, Wand2, Cable, Trash2, LayoutGrid
 } from 'lucide-react';
 import { Player } from '@remotion/player';
 import { PacketFlowComposition } from './PacketFlowAnimation';
@@ -194,10 +198,41 @@ function CiscoHostNode({ data, selected }) {
   );
 }
 
+function CiscoServerNode({ data, selected }) {
+  return (
+    <div className={`px-4 py-3 rounded-2xl glass-card border transition-all ${selected ? 'border-purple-400 shadow-[0_0_20px_rgba(168,85,247,0.4)]' : 'border-border/80'} bg-zinc-950/95 min-w-[140px]`}>
+      <Handle 
+        type="target" 
+        position={Position.Left} 
+        className="!w-2.5 !h-2.5 !bg-zinc-950 !border-2 !border-purple-400 !rounded-full shadow-[0_0_8px_rgba(168,85,247,0.8)] !-left-1.5 transition-transform hover:scale-125" 
+      />
+      <div className="flex items-center gap-2.5">
+        <div className="w-8 h-8 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 shadow-[0_0_10px_rgba(168,85,247,0.2)]">
+          <Database size={16} />
+        </div>
+        <div>
+          <h4 className="text-xs font-bold text-foreground">{data.label}</h4>
+          <span className="text-[10px] text-zinc-500 font-mono block">Enterprise Server</span>
+        </div>
+      </div>
+      <div className="mt-2.5 pt-2 border-t border-border/40 flex items-center justify-between text-[10px] font-mono">
+        <span className="text-purple-400 font-semibold">{data.ip || '10.1.10.100'}</span>
+        <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
+      </div>
+      <Handle 
+        type="source" 
+        position={Position.Right} 
+        className="!w-2.5 !h-2.5 !bg-zinc-950 !border-2 !border-purple-400 !rounded-full shadow-[0_0_8px_rgba(168,85,247,0.8)] !-right-1.5 transition-transform hover:scale-125" 
+      />
+    </div>
+  );
+}
+
 const nodeTypes = {
   ciscoRouter: CiscoRouterNode,
   ciscoSwitch: CiscoSwitchNode,
-  ciscoHost: CiscoHostNode
+  ciscoHost: CiscoHostNode,
+  ciscoServer: CiscoServerNode
 };
 
 const edgeTypes = {
@@ -208,7 +243,7 @@ const edgeTypes = {
 // ==========================================
 // 2. MAIN TOPOLOGY DIGITAL TWIN COMPONENT
 // ==========================================
-export default function TopologyFlowView({ onClose, hasMismatch: initialMismatch = true }) {
+function TopologyFlowContent({ onClose, hasMismatch: initialMismatch = true }) {
   const [selectedNode, setSelectedNode] = useState(null);
   const [hasMismatch, setHasMismatch] = useState(initialMismatch);
   const [faultLabel, setFaultLabel] = useState("Switchport trunk native VLAN mismatch across SW1 <-> SW2");
@@ -396,9 +431,219 @@ export default function TopologyFlowView({ onClose, hasMismatch: initialMismatch
     }
   };
 
+  const { screenToFlowPosition, fitView } = useReactFlow();
+
   const onNodeClick = useCallback((_, node) => {
     setSelectedNode(node);
   }, []);
+
+  // Drag and drop from Packet Tracer device shelf
+  const onDragStart = (event, nodeType) => {
+    event.dataTransfer.setData('application/reactflow', nodeType);
+    event.dataTransfer.effectAllowed = 'move';
+  };
+
+  const onDragOver = useCallback((event) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  const onDrop = useCallback(
+    (event) => {
+      event.preventDefault();
+      const type = event.dataTransfer.getData('application/reactflow');
+      if (!type) return;
+
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      const configMap = {
+        ciscoRouter: { prefix: 'Router', devType: 'Router', defaultIp: '192.168.1.1' },
+        ciscoSwitch: { prefix: 'SW', devType: 'Switch', defaultIp: null },
+        ciscoHost: { prefix: 'Host', devType: 'Host', defaultIp: '10.1.10.15' },
+        ciscoServer: { prefix: 'Server', devType: 'Server', defaultIp: '10.1.10.100' }
+      };
+
+      const cfg = configMap[type] || { prefix: 'Dev', devType: 'Device', defaultIp: '10.1.1.1' };
+      const currentOfType = nodes.filter(n => n.type === type).length + 1;
+      const label = `${cfg.prefix}-${currentOfType}`;
+      const id = label.toLowerCase();
+
+      const newNode = {
+        id,
+        type,
+        position,
+        data: {
+          label,
+          deviceType: cfg.devType,
+          ip: cfg.defaultIp,
+          vlan: type === 'ciscoSwitch' ? 'VLAN 10' : undefined,
+          interfaces: ['GigabitEthernet0/1 (Up)']
+        }
+      };
+
+      setNodes((nds) => nds.concat(newNode));
+      toast.success(`Dropped ${label} (${cfg.devType}) into Digital Twin`);
+
+      handleMutation('ADD_DEVICE', {
+        id: label,
+        type: cfg.devType,
+        ip: cfg.defaultIp,
+        x: Math.round(position.x),
+        y: Math.round(position.y)
+      });
+    },
+    [screenToFlowPosition, nodes, setNodes]
+  );
+
+  const handleAddDeviceClick = (type) => {
+    const configMap = {
+      ciscoRouter: { prefix: 'Router', devType: 'Router', defaultIp: '192.168.1.1', y: 80 },
+      ciscoSwitch: { prefix: 'SW', devType: 'Switch', defaultIp: null, y: 240 },
+      ciscoHost: { prefix: 'Host', devType: 'Host', defaultIp: '10.1.10.15', y: 420 },
+      ciscoServer: { prefix: 'Server', devType: 'Server', defaultIp: '10.1.10.100', y: 420 }
+    };
+    const cfg = configMap[type] || { prefix: 'Dev', devType: 'Device', defaultIp: '10.1.1.1', y: 200 };
+    const currentOfType = nodes.filter(n => n.type === type).length + 1;
+    const label = `${cfg.prefix}-${currentOfType}`;
+    const id = label.toLowerCase();
+    const x = 120 + (currentOfType * 180);
+    const position = { x, y: cfg.y };
+
+    const newNode = {
+      id,
+      type,
+      position,
+      data: {
+        label,
+        deviceType: cfg.devType,
+        ip: cfg.defaultIp,
+        vlan: type === 'ciscoSwitch' ? 'VLAN 10' : undefined,
+        interfaces: ['GigabitEthernet0/1 (Up)']
+      }
+    };
+    setNodes((nds) => nds.concat(newNode));
+    toast.success(`Spawned ${label} (${cfg.devType})`);
+    handleMutation('ADD_DEVICE', {
+      id: label,
+      type: cfg.devType,
+      ip: cfg.defaultIp,
+      x: position.x,
+      y: position.y
+    });
+  };
+
+  // Interactive Cable Wiring
+  const onConnect = useCallback(
+    (params) => {
+      const sourceNode = nodes.find(n => n.id === params.source);
+      const targetNode = nodes.find(n => n.id === params.target);
+      
+      const isSwitchToSwitch = sourceNode?.type === 'ciscoSwitch' && targetNode?.type === 'ciscoSwitch';
+      const isRouterLink = sourceNode?.type === 'ciscoRouter' || targetNode?.type === 'ciscoRouter';
+
+      let edgeLabel = 'GigabitEthernet (Access)';
+      let isTrunk = false;
+      if (isSwitchToSwitch) {
+        edgeLabel = '802.1Q TRUNK (Native 1)';
+        isTrunk = true;
+      } else if (isRouterLink) {
+        edgeLabel = 'Routed Link (L3)';
+      }
+
+      const edgeId = `e-${params.source}-${params.target}`;
+      const newEdge = {
+        ...params,
+        id: edgeId,
+        type: 'ciscoEdge',
+        animated: true,
+        label: edgeLabel,
+        style: { stroke: '#38bdf8', strokeWidth: 2 }
+      };
+
+      setEdges((eds) => addEdge(newEdge, eds));
+      toast.success(`Cabled ${sourceNode?.data?.label || params.source} <-> ${targetNode?.data?.label || params.target}`);
+
+      handleMutation('ADD_LINK', {
+        source: sourceNode?.data?.label || params.source,
+        target: targetNode?.data?.label || params.target,
+        intf_a: 'Gi0/1',
+        intf_b: 'Gi0/1',
+        is_trunk: isTrunk,
+        native_vlan: 1
+      });
+    },
+    [nodes, setEdges]
+  );
+
+  const onNodesDelete = useCallback((deletedNodes) => {
+    deletedNodes.forEach(n => {
+      const devName = n.data?.label || n.id;
+      handleMutation('REMOVE_DEVICE', { id: devName });
+      toast.info(`Removed ${devName}`);
+    });
+  }, []);
+
+  const onEdgesDelete = useCallback((deletedEdges) => {
+    deletedEdges.forEach(e => {
+      handleMutation('REMOVE_LINK', { source: e.source, target: e.target });
+      toast.info(`Disconnected cable`);
+    });
+  }, []);
+
+  const handleBuildTemplate = (templateType) => {
+    if (templateType === 'star') {
+      const starNodes = [
+        { id: 'SW-Core', type: 'Switch', vlan: 1 },
+        { id: 'Host-1', type: 'Host', ip: '192.168.1.10/24' },
+        { id: 'Host-2', type: 'Host', ip: '192.168.1.11/24' },
+        { id: 'Host-3', type: 'Host', ip: '192.168.1.12/24' },
+        { id: 'Server-1', type: 'Server', ip: '192.168.1.100/24' },
+      ];
+      const starLinks = [
+        { source: 'SW-Core', target: 'Host-1', is_trunk: false },
+        { source: 'SW-Core', target: 'Host-2', is_trunk: false },
+        { source: 'SW-Core', target: 'Host-3', is_trunk: false },
+        { source: 'SW-Core', target: 'Server-1', is_trunk: false },
+      ];
+      handleMutation('BUILD_TOPOLOGY', {
+        layout: 'star',
+        nodes: starNodes,
+        links: starLinks
+      });
+      setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 300);
+    } else if (templateType === 'enterprise') {
+      const enterpriseNodes = [
+        { id: 'R1', type: 'Router', ip: '192.168.1.1/24' },
+        { id: 'SW1', type: 'Switch', vlan: 10 },
+        { id: 'SW2', type: 'Switch', vlan: 10 },
+        { id: 'Host-A', type: 'Host', ip: '10.1.10.5/24' },
+        { id: 'Host-B', type: 'Host', ip: '10.1.10.6/24' },
+        { id: 'Server-1', type: 'Server', ip: '10.1.10.100/24' }
+      ];
+      const enterpriseLinks = [
+        { source: 'R1', target: 'SW1', is_trunk: false },
+        { source: 'R1', target: 'SW2', is_trunk: false },
+        { source: 'SW1', target: 'SW2', is_trunk: true, native_vlan: 1 },
+        { source: 'SW1', target: 'Host-A', is_trunk: false },
+        { source: 'SW2', target: 'Host-B', is_trunk: false },
+        { source: 'SW2', target: 'Server-1', is_trunk: false }
+      ];
+      handleMutation('BUILD_TOPOLOGY', {
+        layout: 'hierarchical',
+        nodes: enterpriseNodes,
+        links: enterpriseLinks
+      });
+      setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 300);
+    }
+  };
+
+  const handleAutoLayout = (layout = 'hierarchical') => {
+    handleMutation('AUTO_LAYOUT', { layout });
+    setTimeout(() => fitView({ padding: 0.2, duration: 400 }), 300);
+  };
 
   // Canvas Vector High-Res PNG Export directly to D:\downloads
   const handleExportPng = async () => {
@@ -706,13 +951,139 @@ export default function TopologyFlowView({ onClose, hasMismatch: initialMismatch
 
       {/* 3. Main Body Canvas & Drawers */}
       <div className="flex-1 relative flex overflow-hidden">
-        {/* React Flow Viewport */}
-        <div className="flex-1 h-full relative">
+        {/* React Flow Viewport with Drag & Drop */}
+        <div 
+          className="flex-1 h-full relative"
+          onDragOver={onDragOver}
+          onDrop={onDrop}
+        >
+          {/* Packet Tracer Device Shelf & Auto-Layout Floating Dock */}
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-2 rounded-2xl border border-border/80 bg-zinc-950/90 shadow-2xl backdrop-blur-xl select-none">
+            <div className="flex items-center gap-1.5 pr-2.5 border-r border-border/60">
+              <Cable size={14} className="text-sky-400" />
+              <span className="text-[11px] font-mono font-bold text-zinc-300">Device Shelf:</span>
+            </div>
+
+            {/* Draggable Cisco 4331 Router */}
+            <div
+              draggable
+              onDragStart={(e) => onDragStart(e, 'ciscoRouter')}
+              onClick={() => handleAddDeviceClick('ciscoRouter')}
+              className="group flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 cursor-grab active:cursor-grabbing transition-all hover:scale-105 shadow-sm"
+              title="Drag onto canvas or click to add Cisco 4331 Router"
+            >
+              <div className="w-5 h-5 rounded-lg bg-cyan-500/20 flex items-center justify-center text-cyan-400">
+                <Network size={12} />
+              </div>
+              <div className="text-left">
+                <div className="text-[11px] font-bold leading-tight">Router</div>
+                <div className="text-[9px] text-cyan-400/70 font-mono leading-none">ISR 4331</div>
+              </div>
+            </div>
+
+            {/* Draggable Catalyst 2960 Switch */}
+            <div
+              draggable
+              onDragStart={(e) => onDragStart(e, 'ciscoSwitch')}
+              onClick={() => handleAddDeviceClick('ciscoSwitch')}
+              className="group flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 cursor-grab active:cursor-grabbing transition-all hover:scale-105 shadow-sm"
+              title="Drag onto canvas or click to add Catalyst 2960 Switch"
+            >
+              <div className="w-5 h-5 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400">
+                <Server size={12} />
+              </div>
+              <div className="text-left">
+                <div className="text-[11px] font-bold leading-tight">Switch</div>
+                <div className="text-[9px] text-blue-400/70 font-mono leading-none">2960</div>
+              </div>
+            </div>
+
+            {/* Draggable Workstation Host */}
+            <div
+              draggable
+              onDragStart={(e) => onDragStart(e, 'ciscoHost')}
+              onClick={() => handleAddDeviceClick('ciscoHost')}
+              className="group flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 cursor-grab active:cursor-grabbing transition-all hover:scale-105 shadow-sm"
+              title="Drag onto canvas or click to add PC / Host Workstation"
+            >
+              <div className="w-5 h-5 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                <Laptop size={12} />
+              </div>
+              <div className="text-left">
+                <div className="text-[11px] font-bold leading-tight">PC / Host</div>
+                <div className="text-[9px] text-emerald-400/70 font-mono leading-none">Endpoint</div>
+              </div>
+            </div>
+
+            {/* Draggable Enterprise Server */}
+            <div
+              draggable
+              onDragStart={(e) => onDragStart(e, 'ciscoServer')}
+              onClick={() => handleAddDeviceClick('ciscoServer')}
+              className="group flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 cursor-grab active:cursor-grabbing transition-all hover:scale-105 shadow-sm"
+              title="Drag onto canvas or click to add Enterprise Server"
+            >
+              <div className="w-5 h-5 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400">
+                <Database size={12} />
+              </div>
+              <div className="text-left">
+                <div className="text-[11px] font-bold leading-tight">Server</div>
+                <div className="text-[9px] text-purple-400/70 font-mono leading-none">Enterprise</div>
+              </div>
+            </div>
+
+            {/* Quick Actions & Auto-Layout */}
+            <div className="flex items-center gap-1.5 pl-2 border-l border-border/60">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleAutoLayout('hierarchical')}
+                disabled={isLoading}
+                className="h-7 px-2.5 text-[11px] font-mono rounded-xl bg-white/5 hover:bg-white/10 text-amber-300 gap-1 border border-amber-500/30 shadow-sm"
+                title="Calculate and apply optimal relative distances between tiers"
+              >
+                <Wand2 size={12} className="text-amber-400" />
+                <span>Auto-Layout</span>
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleBuildTemplate('star')}
+                disabled={isLoading}
+                className="h-7 px-2 text-[10px] font-mono rounded-xl text-zinc-400 hover:text-white hover:bg-white/5"
+                title="Build Star Hub-and-Spoke Topology"
+              >
+                Star
+              </Button>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => handleBuildTemplate('enterprise')}
+                disabled={isLoading}
+                className="h-7 px-2 text-[10px] font-mono rounded-xl text-zinc-400 hover:text-white hover:bg-white/5"
+                title="Build 3-Tier Enterprise Network"
+              >
+                3-Tier
+              </Button>
+            </div>
+          </div>
+
+          {/* Quick Guide Pill */}
+          <div className="absolute top-4 right-6 z-10 hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-xl border border-white/10 bg-black/60 text-[10px] font-mono text-zinc-400 backdrop-blur-md select-none">
+            <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse" />
+            <span>Drag port handles to cable • Del to disconnect</span>
+          </div>
+
           <ReactFlow
             nodes={nodes}
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
+            onConnect={onConnect}
+            onNodesDelete={onNodesDelete}
+            onEdgesDelete={onEdgesDelete}
             onNodeClick={onNodeClick}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
@@ -722,7 +1093,7 @@ export default function TopologyFlowView({ onClose, hasMismatch: initialMismatch
             <Background color="#1e293b" gap={28} size={1} />
             <Controls className="bg-zinc-950 border border-border/80 rounded-xl overflow-hidden fill-white" />
             <MiniMap 
-              nodeColor={(n) => n.data?.isMismatch ? '#f43f5e' : (n.type === 'ciscoRouter' ? '#38bdf8' : (n.type === 'ciscoSwitch' ? '#60a5fa' : '#34d399'))} 
+              nodeColor={(n) => n.data?.isMismatch ? '#f43f5e' : (n.type === 'ciscoRouter' ? '#38bdf8' : (n.type === 'ciscoSwitch' ? '#60a5fa' : (n.type === 'ciscoServer' ? '#a855f7' : '#34d399')))} 
               className="bg-zinc-950/80 border border-border/80 rounded-xl"
             />
           </ReactFlow>
@@ -972,5 +1343,13 @@ export default function TopologyFlowView({ onClose, hasMismatch: initialMismatch
         )}
       </div>
     </div>
+  );
+}
+
+export default function TopologyFlowView(props) {
+  return (
+    <ReactFlowProvider>
+      <TopologyFlowContent {...props} />
+    </ReactFlowProvider>
   );
 }

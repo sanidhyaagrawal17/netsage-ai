@@ -136,9 +136,9 @@ export default function ChatPanel() {
 
   const quickPrompts = [
     "Fix native VLAN mismatch in Digital Twin",
-    "Simulate core trunk failure in Digital Twin",
+    "Build a star topology with 1 switch and 4 hosts",
     "Deploy redundant backup router R2 (HSRP)",
-    "Explain native VLAN mismatch simply"
+    "Simulate core trunk failure in Digital Twin"
   ];
 
   const stopGeneration = () => {

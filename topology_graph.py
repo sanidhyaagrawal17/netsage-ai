@@ -25,11 +25,15 @@ class NetworkPropertyGraph:
         self.graph = nx.MultiGraph()
         self.device_interfaces: Dict[str, Dict[str, Dict[str, Any]]] = {}
 
-    def add_device(self, device_id: str, device_type: str = "Router", model: str = ""):
-        """Register a network device node."""
+    def add_device(self, device_id: str, device_type: str = "Router", model: str = "", x: Optional[int] = None, y: Optional[int] = None):
+        """Register a network device node with optional coordinates."""
         dev_id = device_id.strip()
         dtype = device_type.capitalize()
-        self.graph.add_node(dev_id, node_type="device", device_type=dtype, model=model)
+        attrs = {"node_type": "device", "device_type": dtype, "model": model}
+        if x is not None and y is not None:
+            attrs["x"] = int(x)
+            attrs["y"] = int(y)
+        self.graph.add_node(dev_id, **attrs)
         if dev_id not in self.device_interfaces:
             self.device_interfaces[dev_id] = {}
 
@@ -350,6 +354,8 @@ class NetworkPropertyGraph:
             flow_type = "ciscoRouter"
             if "switch" in dtype:
                 flow_type = "ciscoSwitch"
+            elif "server" in dtype:
+                flow_type = "ciscoServer"
             elif "host" in dtype or "pc" in dtype or "endpoint" in dtype:
                 flow_type = "ciscoHost"
 
@@ -378,10 +384,14 @@ class NetworkPropertyGraph:
                     is_mismatch = True
 
             norm_id = n.lower().replace(" ", "-")
-            pos = canonical_positions.get(norm_id)
+            pos = None
+            if "x" in d and "y" in d:
+                pos = {"x": int(d["x"]), "y": int(d["y"])}
             if not pos:
-                tier_y = 50 if flow_type == "ciscoRouter" else (200 if flow_type == "ciscoSwitch" else 350)
-                pos = {"x": 80 + (i * 220), "y": tier_y}
+                pos = canonical_positions.get(norm_id)
+            if not pos:
+                tier_y = 60 if flow_type == "ciscoRouter" else (220 if flow_type == "ciscoSwitch" else 400)
+                pos = {"x": 100 + (i * 240), "y": tier_y}
 
             nodes.append({
                 "id": norm_id,
@@ -462,7 +472,9 @@ class NetworkPropertyGraph:
         if action == "ADD_DEVICE":
             dev_id = mutation.get("id") or mutation.get("device_id") or "NewDevice"
             dtype = mutation.get("type") or mutation.get("device_type") or "Router"
-            self.add_device(dev_id, dtype)
+            x = mutation.get("x")
+            y = mutation.get("y")
+            self.add_device(dev_id, dtype, x=x, y=y)
             if mutation.get("ip"):
                 ip_parts = mutation["ip"].split("/")
                 ip_addr = ip_parts[0]
@@ -472,7 +484,7 @@ class NetworkPropertyGraph:
 
         elif action == "ADD_BACKUP_ROUTER":
             dev_id = "R2-Backup"
-            self.add_device(dev_id, "Router", model="Cisco 4331")
+            self.add_device(dev_id, "Router", model="Cisco 4331", x=480, y=50)
             self.add_interface(dev_id, "Gi0/0/0", ip_addr="10.1.10.254", subnet_mask="255.255.255.0", vlan=10)
             self.add_interface(dev_id, "Gi0/0/1", ip_addr="10.1.20.254", subnet_mask="255.255.255.0", vlan=20)
             self.add_link(dev_id, "Gi0/0/0", "SW1", "Gi0/2", link_type="HSRP Standby (VLAN 10)")
@@ -496,6 +508,16 @@ class NetworkPropertyGraph:
             native_vlan = int(mutation.get("native_vlan", 1))
             self.add_link(dev_a, intf_a, dev_b, intf_b, is_trunk=is_trunk, native_vlan=native_vlan)
             return {"status": "success", "message": f"Linked {dev_a} ({intf_a}) <-> {dev_b} ({intf_b})"}
+
+        elif action == "REMOVE_LINK":
+            dev_a = mutation.get("dev_a") or mutation.get("source")
+            dev_b = mutation.get("dev_b") or mutation.get("target")
+            removed = False
+            for u, v, k in list(self.graph.edges(keys=True)):
+                if (u.lower() == dev_a.lower() and v.lower() == dev_b.lower()) or (u.lower() == dev_b.lower() and v.lower() == dev_a.lower()):
+                    self.graph.remove_edge(u, v, key=k)
+                    removed = True
+            return {"status": "success" if removed else "error", "message": f"Removed link between {dev_a} and {dev_b}"}
 
         elif action == "SET_LINK_STATUS":
             dev_a = mutation.get("dev_a") or mutation.get("source")
@@ -527,6 +549,61 @@ class NetworkPropertyGraph:
                         idata["native_vlan"] = 1
             return {"status": "success", "message": "Self-healing executed: links restored to UP, VLANs synchronized to 1."}
 
+        elif action == "AUTO_LAYOUT":
+            layout_type = mutation.get("layout", "hierarchical")
+            pos_map = calculate_relative_distances(self.graph, layout=layout_type)
+            for nid, pos in pos_map.items():
+                if self.graph.has_node(nid):
+                    self.graph.nodes[nid]["x"] = pos["x"]
+                    self.graph.nodes[nid]["y"] = pos["y"]
+            return {"status": "success", "message": f"Auto-layout computed with relative distances ({layout_type})."}
+
+        elif action == "BUILD_TOPOLOGY":
+            nodes_input = mutation.get("nodes", [])
+            links_input = mutation.get("links", [])
+            layout_type = mutation.get("layout", "hierarchical")
+
+            if not nodes_input:
+                return {"status": "error", "message": "No nodes provided in BUILD_TOPOLOGY"}
+
+            self.graph = nx.MultiGraph()
+            self.device_interfaces = {}
+
+            # Calculate relative distances for all input nodes
+            pos_map = calculate_relative_distances(nodes_input, layout=layout_type)
+
+            for nd in nodes_input:
+                nid = nd.get("id") or nd.get("name") or "Device"
+                ntype = nd.get("type") or nd.get("device_type") or "Router"
+                pos = pos_map.get(nid, {"x": 200, "y": 200})
+                if "x" in nd and "y" in nd:
+                    pos = {"x": int(nd["x"]), "y": int(nd["y"])}
+                
+                self.add_device(nid, ntype, x=pos["x"], y=pos["y"])
+                
+                ip = nd.get("ip")
+                vlan = nd.get("vlan")
+                if ip:
+                    ip_clean = ip.split("/")[0]
+                    mask = "255.255.255.0"
+                    self.add_interface(nid, "Fa0/1" if "host" in ntype.lower() else "Gi0/1", ip_addr=ip_clean, subnet_mask=mask, vlan=vlan)
+
+            for lk in links_input:
+                src = lk.get("source") or lk.get("dev_a")
+                dst = lk.get("target") or lk.get("dev_b")
+                if src and dst:
+                    intf_a = lk.get("intf_a", "Gi0/1")
+                    intf_b = lk.get("intf_b", "Gi0/1")
+                    is_trunk = bool(lk.get("is_trunk", False))
+                    native_vlan = int(lk.get("native_vlan", 1))
+                    link_type = lk.get("link_type", "802.1Q Trunk" if is_trunk else "Ethernet")
+                    self.add_link(src, intf_a, dst, intf_b, link_type=link_type, is_trunk=is_trunk, native_vlan=native_vlan)
+
+            return {
+                "status": "success",
+                "message": f"Constructed requested {layout_type} topology: {len(nodes_input)} nodes, {len(links_input)} links."
+            }
+
         elif action == "RESET":
             default_g = build_default_enterprise_topology(has_mismatch=True)
             self.graph = default_g.graph
@@ -534,6 +611,119 @@ class NetworkPropertyGraph:
             return {"status": "success", "message": "Reset topology to baseline."}
 
         return {"status": "error", "message": f"Unknown action: {action}"}
+
+
+def calculate_relative_distances(
+    graph_or_nodes: Any, 
+    links: Optional[List[Dict[str, Any]]] = None, 
+    layout: str = "hierarchical"
+) -> Dict[str, Dict[str, int]]:
+    """
+    Computes deterministic relative spatial coordinates (x, y) for network nodes with collision avoidance.
+    Supports:
+      1. 'hierarchical' (Enterprise 3-tier: Core Routers -> Distribution Switches -> Access Endpoints)
+      2. 'star' / 'hub-and-spoke' (Central Core Switch/Router with radial equidistant satellites)
+    """
+    import math
+
+    node_entries: List[Tuple[str, str]] = []
+    if isinstance(graph_or_nodes, (nx.Graph, nx.MultiGraph)):
+        for n, d in graph_or_nodes.nodes(data=True):
+            if d.get("node_type") == "device":
+                node_entries.append((n, d.get("device_type", "Router")))
+    elif isinstance(graph_or_nodes, list):
+        for item in graph_or_nodes:
+            if isinstance(item, dict):
+                nid = item.get("id") or item.get("name") or "Node"
+                ntype = item.get("type") or item.get("device_type") or "Router"
+                node_entries.append((nid, ntype))
+            elif isinstance(item, str):
+                node_entries.append((item, "Router"))
+
+    if not node_entries:
+        return {}
+
+    positions: Dict[str, Dict[str, int]] = {}
+
+    if layout.lower() in ["star", "hub-and-spoke", "hub_and_spoke"]:
+        # Find central node (first router, or switch, or 0)
+        hub_idx = 0
+        for idx, (nid, ntype) in enumerate(node_entries):
+            if "router" in ntype.lower() or "switch" in ntype.lower():
+                hub_idx = idx
+                break
+        hub_id, _ = node_entries[hub_idx]
+        positions[hub_id] = {"x": 500, "y": 260}
+
+        satellites = [e for i, e in enumerate(node_entries) if i != hub_idx]
+        num_sats = len(satellites)
+        if num_sats > 0:
+            radius = max(200, num_sats * 35)
+            for i, (sat_id, _) in enumerate(satellites):
+                angle = (2 * math.pi * i / num_sats) - (math.pi / 2)
+                pos_x = int(500 + radius * math.cos(angle))
+                pos_y = int(260 + radius * math.sin(angle))
+                positions[sat_id] = {"x": pos_x, "y": pos_y}
+        return positions
+
+    # Hierarchical 3-tier layout:
+    # Tier 0: Core / Routers (y = 80)
+    # Tier 1: Distribution / Switches (y = 250)
+    # Tier 2: Access Endpoints / Hosts / Servers (y = 430)
+    routers = []
+    switches = []
+    endpoints = []
+
+    for nid, ntype in node_entries:
+        t_low = ntype.lower()
+        if "router" in t_low or "gateway" in t_low:
+            routers.append(nid)
+        elif "switch" in t_low:
+            switches.append(nid)
+        else:
+            endpoints.append(nid)
+
+    tier_y_map = {
+        "router": 80,
+        "switch": 250,
+        "endpoint": 430
+    }
+    if not routers:
+        tier_y_map["switch"] = 120
+        tier_y_map["endpoint"] = 320
+
+    center_x = 500
+
+    def layout_tier(nodes_in_tier: List[str], tier_y: int):
+        k = len(nodes_in_tier)
+        if k == 0:
+            return
+        spacing = 240 if k <= 4 else max(160, int(840 / k))
+        total_width = (k - 1) * spacing
+        start_x = center_x - (total_width // 2)
+        for i, nid in enumerate(nodes_in_tier):
+            px = max(80, start_x + (i * spacing))
+            positions[nid] = {"x": px, "y": tier_y}
+
+    layout_tier(routers, tier_y_map["router"])
+    layout_tier(switches, tier_y_map["switch"])
+    layout_tier(endpoints, tier_y_map["endpoint"])
+
+    # Collision avoidance check (min separation: 160px)
+    node_ids = list(positions.keys())
+    for i in range(len(node_ids)):
+        for j in range(i + 1, len(node_ids)):
+            n1 = node_ids[i]
+            n2 = node_ids[j]
+            p1 = positions[n1]
+            p2 = positions[n2]
+            dx = p1["x"] - p2["x"]
+            dy = p1["y"] - p2["y"]
+            dist = (dx**2 + dy**2)**0.5
+            if dist < 140:
+                positions[n2]["x"] += int(160 - dist)
+
+    return positions
 
 
 def build_default_enterprise_topology(has_mismatch: bool = True) -> NetworkPropertyGraph:
